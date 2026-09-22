@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { apiRequest } from "../apiClient";
+import { useAuth } from "./AuthContext";
 export type BankAccount = {
   id: string;
   name: string;
@@ -351,11 +353,80 @@ updateBankAccount: (
 const AppDataContext = createContext<AppDataContextType | null>(null);
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
+    const { user, isInitialized } = useAuth();
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
   const [selectedAccount, setSelectedAccount] =
   useState<BankAccount | null>(null);
   const [autoInvoices, setAutoInvoices] = useState<AutoInvoice[]>(INIT_AUTO_INVOICES);
-  const [notifications, setNotifications] = useState<AppNotification[]>(INIT_NOTIFICATIONS);
+ const [notifications, setNotifications] = useState<AppNotification[]>([]);
+useEffect(() => {
+  if (!isInitialized || !user) {
+    return;
+  }
+
+  const loadNotifications = async () => {
+    try {
+      const response = await apiRequest(
+        "/v1/notifications/"
+      );
+
+      console.log(
+        "=== NOTIFICATIONS DJANGO ===",
+        response
+      );
+
+      const data = response.results ?? response ?? [];
+
+      setNotifications(
+        data.map((n: any) => ({
+          id: n.id,
+          type: n.type || "info",
+          title: n.title || "Notification",
+          message: n.message || "",
+          read: n.is_read ?? n.read ?? false,
+          date: n.created_at || n.date,
+          module: n.module || "",
+          documentRef: n.document_ref,
+          motifRejet: n.motif_rejet,
+        }))
+      );
+    } catch (error) {
+      console.error(
+        "=== ERREUR NOTIFICATIONS DJANGO ===",
+        error
+      );
+    }
+  };
+
+  loadNotifications();
+}, [isInitialized, user]);
+
+useEffect(() => {
+  if (!isInitialized || !user) {
+    return;
+  }
+
+  const loadUnreadCount = async () => {
+    try {
+      const response = await apiRequest(
+        "/v1/notifications/unread-count/"
+      );
+
+      console.log(
+        "=== UNREAD COUNT DJANGO ===",
+        response
+      );
+    } catch (error) {
+      console.error(
+        "=== ERREUR UNREAD COUNT DJANGO ===",
+        error
+      );
+    }
+  };
+
+  loadUnreadCount();
+}, [isInitialized, user]);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [clients, setClients] = useState<Client[]>(INIT_CLIENTS);
 
@@ -538,17 +609,50 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+ const [unreadCount, setUnreadCount] = useState(0);
 
-  const markNotificationRead = (id: string) => {
+  const markNotificationRead = async (id: string) => {
+  try {
+    await apiRequest(`/v1/notifications/${id}/mark-read/`, {
+      method: "POST",
+    });
+
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      prev.map((n) =>
+        n.id === id ? { ...n, read: true } : n
+      )
     );
-  };
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
+    console.log(
+      "=== NOTIFICATION MARQUÉE LUE ===",
+      id
+    );
+  } catch (error) {
+    console.error(
+      "=== ERREUR MARK NOTIFICATION ===",
+      error
+    );
+  }
+};
+
+ const markAllRead = async () => {
+  try {
+    await apiRequest("/v1/notifications/mark-all-read/", {
+      method: "POST",
+    });
+
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, read: true }))
+    );
+
+    console.log("=== TOUTES LES NOTIFICATIONS MARQUÉES LUES ===");
+  } catch (error) {
+    console.error(
+      "=== ERREUR MARK ALL NOTIFICATIONS ===",
+      error
+    );
+  }
+};
 
   const addAuditEntry = (entry: Omit<AuditEntry, "id" | "timestamp">) => {
     setAuditLog(prev => [{
