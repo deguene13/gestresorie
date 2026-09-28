@@ -340,6 +340,7 @@ updateBankAccount: (
   unreadCount: number;
   markNotificationRead: (id: string) => void;
   markAllRead: () => void;
+  deleteNotification: (id: string) => Promise<void>;
   addNotification: (notif: Omit<AppNotification, "id" | "date" | "read">) => void;
   auditLog: AuditEntry[];
   addAuditEntry: (entry: Omit<AuditEntry, "id" | "timestamp">) => void;
@@ -360,46 +361,142 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useState<BankAccount | null>(null);
   const [autoInvoices, setAutoInvoices] = useState<AutoInvoice[]>(INIT_AUTO_INVOICES);
  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+ const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
 useEffect(() => {
   if (!isInitialized || !user) {
     return;
   }
 
-  const loadNotifications = async () => {
-    try {
+ const loadNotifications = async () => {
+  try {
+    let allNotifications: any[] = [];
+    let page = 1;
+
+    while (true) {
       const response = await apiRequest(
-        "/v1/notifications/"
+        `/v1/notifications/?page=${page}`
       );
 
       console.log(
-        "=== NOTIFICATIONS DJANGO ===",
+        "=== PAGE NOTIFICATIONS DJANGO ===",
         response
       );
 
       const data = response.results ?? response ?? [];
 
-      setNotifications(
-        data.map((n: any) => ({
-          id: n.id,
-          type: n.type || "info",
-          title: n.title || "Notification",
-          message: n.message || "",
-          read: n.is_read ?? n.read ?? false,
-          date: n.created_at || n.date,
-          module: n.module || "",
-          documentRef: n.document_ref,
-          motifRejet: n.motif_rejet,
-        }))
-      );
-    } catch (error) {
-      console.error(
-        "=== ERREUR NOTIFICATIONS DJANGO ===",
-        error
-      );
-    }
-  };
+      allNotifications = [
+        ...allNotifications,
+        ...data,
+      ];
+      
+      // S'il n'y a plus de page suivante, on arrête
+      if (!response.next) {
+        break;
+      }
 
-  loadNotifications();
+      // On passe à la page suivante
+      page++;
+    }
+
+    console.log(
+      "=== TOTAL NOTIFICATIONS CHARGÉES ===",
+      allNotifications.length
+    );
+
+    console.log(
+      "=== ÉTAT LECTURE NOTIFICATIONS ===",
+      allNotifications.map((n: any) =>
+        `ID=${n.id} | TITRE=${n.title} | is_read=${n.is_read} | read=${n.read}`
+      )
+    );
+
+    setNotifications(
+      allNotifications.map((n: any) => ({
+        id: n.id,
+        type: n.type || "info",
+        title: n.title || "Notification",
+        message: n.message || "",
+        read: n.is_read ?? n.read ?? false,
+        date: n.created_at || n.date,
+        module: n.module || "",
+        documentRef: n.document_ref,
+        motifRejet: n.motif_rejet,
+      }))
+    );
+  } catch (error) {
+    console.error(
+      "=== ERREUR NOTIFICATIONS DJANGO ===",
+      error
+    );
+  }
+};
+
+const loadAuditLog = async () => {
+  try {
+    let allAudit: any[] = [];
+    let page = 1;
+
+    while (true) {
+      const response = await apiRequest(
+        `/v1/audit/?page=${page}`
+      );
+
+      console.log(
+        "=== PAGE AUDIT DJANGO ===",
+        response
+      );
+
+     const data = response.results ?? response ?? [];
+
+console.log(
+  "=== VRAIE DONNÉE AUDIT ===",
+  JSON.stringify(data[0], null, 2)
+);
+
+allAudit = [
+  ...allAudit,
+  ...data,
+];
+
+      // S'il n'y a plus de page suivante, on arrête
+      if (!response.next) {
+        break;
+      }
+
+      page++;
+    }
+
+    console.log(
+      "=== TOTAL AUDIT CHARGÉ ===",
+      allAudit.length
+    );
+
+    setAuditLog(
+  allAudit.map((audit: any) => ({
+    id: audit.id,
+    userId: audit.user_detail?.id || "",
+    userName: audit.user_full_name || audit.user_detail?.full_name || "",
+    userRole: audit.user_role || audit.user_detail?.role || "",
+    action: audit.action || "",
+    module: audit.model_name || "",
+    documentRef: audit.object_repr || "",
+    oldStatus: audit.changes?.from || undefined,
+    newStatus: audit.changes?.to || undefined,
+    motifRejet: audit.changes?.comment || undefined,
+    timestamp: audit.created_at || "",
+    ip: audit.ip_address || undefined,
+  }))
+);
+  } catch (error) {
+    console.error(
+      "=== ERREUR AUDIT DJANGO ===",
+      error
+    );
+  }
+};
+
+loadNotifications();
+loadAuditLog();
 }, [isInitialized, user]);
 
 useEffect(() => {
@@ -417,6 +514,8 @@ useEffect(() => {
         "=== UNREAD COUNT DJANGO ===",
         response
       );
+
+      setUnreadCount(response.unread_count ?? 0);
     } catch (error) {
       console.error(
         "=== ERREUR UNREAD COUNT DJANGO ===",
@@ -427,7 +526,7 @@ useEffect(() => {
 
   loadUnreadCount();
 }, [isInitialized, user]);
-  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  
   const [clients, setClients] = useState<Client[]>(INIT_CLIENTS);
 
  const addBankAccount = async (
@@ -611,7 +710,25 @@ useEffect(() => {
 
  const [unreadCount, setUnreadCount] = useState(0);
 
-  const markNotificationRead = async (id: string) => {
+ const markNotificationRead = async (id: string) => {
+  const notification = notifications.find((n) => n.id === id);
+
+  console.log("=== CLIC NOTIFICATION ===", {
+    id,
+    notification,
+    read: notification?.read,
+  });
+
+  if (!notification) {
+    console.log("=== NOTIFICATION INTROUVABLE ===");
+    return;
+  }
+
+  if (notification.read) {
+    console.log("=== NOTIFICATION DÉJÀ LUE ===");
+    return;
+  }
+
   try {
     await apiRequest(`/v1/notifications/${id}/mark-read/`, {
       method: "POST",
@@ -623,10 +740,11 @@ useEffect(() => {
       )
     );
 
-    console.log(
-      "=== NOTIFICATION MARQUÉE LUE ===",
-      id
-    );
+    
+
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+
+    console.log("=== NOTIFICATION MARQUÉE LUE ===", id);
   } catch (error) {
     console.error(
       "=== ERREUR MARK NOTIFICATION ===",
@@ -634,7 +752,6 @@ useEffect(() => {
     );
   }
 };
-
  const markAllRead = async () => {
   try {
     await apiRequest("/v1/notifications/mark-all-read/", {
@@ -645,10 +762,32 @@ useEffect(() => {
       prev.map((n) => ({ ...n, read: true }))
     );
 
+    setUnreadCount(0);
+
     console.log("=== TOUTES LES NOTIFICATIONS MARQUÉES LUES ===");
   } catch (error) {
     console.error(
       "=== ERREUR MARK ALL NOTIFICATIONS ===",
+      error
+    );
+  }
+};
+const deleteNotification = async (id: string) => {
+  try {
+    console.log("=== SUPPRESSION NOTIFICATION ===", id);
+
+    await apiRequest(`/v1/notifications/${id}/`, {
+      method: "DELETE",
+    });
+
+    setNotifications((prev) =>
+      prev.filter((n) => n.id !== id)
+    );
+
+    console.log("=== NOTIFICATION SUPPRIMÉE ===", id);
+  } catch (error) {
+    console.error(
+      "=== ERREUR SUPPRESSION NOTIFICATION ===",
       error
     );
   }
@@ -717,6 +856,7 @@ useEffect(() => {
         unreadCount,
         markNotificationRead,
         markAllRead,
+        deleteNotification,
         addNotification,
         auditLog,
         addAuditEntry,

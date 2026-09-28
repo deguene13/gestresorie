@@ -254,6 +254,8 @@ const isViewOnly =
   !canValidateStep3;
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
   const [suppliers, setSuppliers] = useState<any[]>([]);
 const mapDjangoInvoice = (invoice: any): Invoice => {
   console.log("=== DONNÉES REJET FACTURE DJANGO ===", {
@@ -363,10 +365,21 @@ const mapDjangoInvoice = (invoice: any): Invoice => {
     try {
       console.log("=== CHARGEMENT FACTURES FOURNISSEURS DJANGO ===");
 
-      const data = await apiRequest("/v1/invoices/supplier/");
+      const data = await apiRequest(
+  `/v1/invoices/supplier/?page=${currentPage}`
+);
 
       console.log("=== RÉPONSE DJANGO FACTURES FOURNISSEURS ===");
       console.log(data);
+      setTotalPages(
+  data.count ? Math.ceil(data.count / 20) : 1
+);
+console.log(
+  "=== PAGINATION FACTURES ===",
+  "count =", data.count,
+  "totalPages =", data.count ? Math.ceil(data.count / 20) : 1,
+  "currentPage =", currentPage
+);
       
 const factureTest = data.results?.find(
   (invoice: any) =>
@@ -410,7 +423,7 @@ console.table(factureTest?.lines);
   };
 
   loadSupplierInvoices();
-}, []);
+}, [currentPage]);
 
 useEffect(() => {
   const loadSuppliers = async () => {
@@ -1276,6 +1289,29 @@ const handleApproveDaf = async (invoiceId: string) => {
               )}
             </tbody>
           </table>
+          <div className="flex items-center justify-between mt-4 p-4 border border-gray-200">
+
+  <button
+    onClick={() => setCurrentPage((page) => page - 1)}
+    disabled={currentPage === 1}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Précédent
+  </button>
+
+  <span className="font-bold">
+    Page {currentPage} sur {totalPages}
+  </span>
+
+  <button
+    onClick={() => setCurrentPage((page) => page + 1)}
+    disabled={currentPage === totalPages}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Suivant
+  </button>
+
+</div>
         </div>
       </div>
 

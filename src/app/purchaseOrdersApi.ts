@@ -34,8 +34,8 @@ export type PurchaseOrdersResponse = {
   results: PurchaseOrder[];
 };
 
-export async function getPurchaseOrders(): Promise<PurchaseOrdersResponse> {
-  return apiRequest("/v1/purchase-orders/");
+export async function getPurchaseOrders(page: number = 1): Promise<PurchaseOrdersResponse> {
+  return apiRequest(`/v1/purchase-orders/?page=${page}`);
 }
 
 export async function getPurchaseOrder(orderId: string) {

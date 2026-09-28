@@ -387,13 +387,29 @@ function generateBLPdf(bl: BLRow, fournisseur: typeof FOURNISSEURS[0] | undefine
 /* ─── Main component ─────────────────────────────────────────────────  */
 
 export function FournisseursEspace() {
+ const [suppliers, setSuppliers] = useState<SupplierUI[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
  useEffect(() => {
   const loadSuppliers = async () => {
     console.log("=== CHARGEMENT FOURNISSEURS DJANGO ===");
 
     try {
-      const response = await apiRequest("/v1/suppliers/");
+      const response = await apiRequest(
+  `/v1/suppliers/?page=${currentPage}`
+);
 
+setTotalPages(
+  response.count ? Math.ceil(response.count / 20) : 1
+);
+console.log(
+  "=== PAGINATION FOURNISSEURS ===",
+  "Page actuelle :", currentPage,
+  "Total éléments :", response.count,
+  "Total pages :", response.count
+    ? Math.ceil(response.count / 20)
+    : 1
+);
       console.log(
         "=== FOURNISSEURS DJANGO ===",
         JSON.stringify(response, null, 2)
@@ -438,7 +454,7 @@ export function FournisseursEspace() {
   };
 
   loadSuppliers();
-}, []);
+}, [currentPage]);
 
 useEffect(() => {
   const loadPurchaseOrders = async () => {
@@ -618,7 +634,7 @@ useEffect(() => {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("Toutes catégories");
   const [statusFilter, setStatusFilter] = useState<"Tous" | "Actif" | "Inactif">("Tous");
-  const [suppliers, setSuppliers] = useState<SupplierUI[]>([]);
+ 
 
   /* Selection */
   const [selectedF, setSelectedF] = useState<typeof FOURNISSEURS[0] | null>(null);
@@ -1309,6 +1325,29 @@ setUploadProgress(30);
 </div>
               );
             })}
+                   </div>
+
+          {/* Pagination fournisseurs */}
+          <div className="flex items-center justify-between p-4 border-t border-gray-200">
+            <button
+              onClick={() => setCurrentPage((page) => page - 1)}
+              disabled={currentPage === 1}
+              className="px-4 py-2 border rounded disabled:opacity-50"
+            >
+              Précédent
+            </button>
+
+            <span className="font-bold text-sm">
+              Page {currentPage} sur {totalPages}
+            </span>
+
+            <button
+              onClick={() => setCurrentPage((page) => page + 1)}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 border rounded disabled:opacity-50"
+            >
+              Suivant
+            </button>
           </div>
         </div>
 

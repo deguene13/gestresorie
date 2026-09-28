@@ -22,6 +22,10 @@ import { DocumentGenerator } from "./components/pages/DocumentGenerator";
 import { Quotes } from "./components/pages/Quotes";
 import { DailyTreasury } from "./components/pages/DailyTreasury";
 import { GlobalTreasury } from "./components/pages/GlobalTreasury";
+import Audit from "./components/pages/Audit";
+import { Companies } from "./components/pages/Companies";
+import { Approvals } from "./components/pages/Approvals";
+import { Reports } from "./components/pages/Reports";
 // Keep old routes for backward compatibility
 import { Deliveries } from "./components/pages/Deliveries";
 import { SupplierPortal } from "./components/portals/SupplierPortal";
@@ -62,6 +66,10 @@ export const router = createBrowserRouter([
       { path: "documents", element: <DocumentGenerator /> },
       { path: "daily-treasury", element: <DailyTreasury /> },
       { path: "global-treasury", element: <GlobalTreasury /> },
+      { path: "audit", element: <Audit /> },
+      { path: "companies", element: <Companies /> },
+      { path: "approvals", element: <Approvals /> },
+      { path: "reports", element: <Reports /> },
       { path: "settings", element: <UserSettings /> },
       { path: "clients", element: <ClientManagement /> },
       { path: "fournisseurs-espace", element: <FournisseursEspace /> },

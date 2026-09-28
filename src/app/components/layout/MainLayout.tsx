@@ -18,6 +18,8 @@ import {
   TrendingDown,
   Menu,
   X,
+  Trash2,
+  CheckCircle,
   Bell,
   Settings,
   LogOut,
@@ -65,6 +67,7 @@ const bottomItems: NavItem[] = [
   { icon: FilePlus, label: "Liasse comptable", path: "/app/documents" },
   { icon: BarChart3, label: "Trésorerie journalière", path: "/app/daily-treasury" },
   { icon: Globe2, label: "Trésorerie globale", path: "/app/global-treasury" },
+  { icon: ClipboardList, label: "Journal d'audit", path: "/app/audit" },
 ];
 
 function NavItemButton({
@@ -163,9 +166,16 @@ export function MainLayout() {
   const [venteOpen, setVenteOpen] = useState(
     venteChildren.some((c) => location.pathname === c.path)
   );
+  const [parametresOpen, setParametresOpen] = useState(false);
 
   const { lang, setLang, t } = useLanguage();
-  const { notifications, unreadCount, markAllRead, markNotificationRead } = useAppData();
+  const {
+  notifications,
+  unreadCount,
+  markAllRead,
+  markNotificationRead,
+  deleteNotification,
+} = useAppData();
   const auth = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const handleLogout = () => { auth.logout(); navigate("/login"); };
@@ -206,6 +216,27 @@ export function MainLayout() {
   const topItemsI18n = [
     { icon: LayoutDashboard, label: t.nav.dashboard[lang], path: "/app" },
   ].filter(() => can("dashboard:view"));
+  const parametresChildrenI18n = [
+  {
+    icon: Building2,
+    label: "Entreprises",
+    path: "/app/companies",
+    perm: "companies:view",
+  },
+  {
+    icon: ClipboardList,
+    label: "Journal d'audit",
+    path: "/app/audit",
+    perm: "audit:view",
+  },
+  {
+    icon: CheckCircle,
+    label: "Approbations",
+    path: "/app/approvals",
+    perm: "approvals:view",
+  },
+  
+].filter(item => can(item.perm));
 
   const bottomItemsI18n = [
     { icon: Users,        label: t.nav.users[lang],       path: "/app/users",            perm: "users:manage" },
@@ -216,6 +247,8 @@ export function MainLayout() {
     { icon: FilePlus,     label: t.nav.documents[lang],   path: "/app/documents",        perm: "documents:view" },
     { icon: BarChart3,    label: t.nav.dailyTreasury[lang],path: "/app/daily-treasury",  perm: "daily_treasury:view" },
     { icon: Globe2,       label: "Trésorerie globale",    path: "/app/global-treasury",  perm: "global_treasury:view" },
+    
+    
   ].filter(item => can(item.perm));
 
   const SidebarContent = ({ onNavigate }: { onNavigate: (path: string) => void }) => (
@@ -259,19 +292,35 @@ export function MainLayout() {
         )}
 
         {/* Separator */}
-        <div className="my-2 border-t border-gray-100" />
+<div className="my-2 border-t border-gray-100" />
 
-        {/* Bottom items */}
-        {bottomItemsI18n.map((item) => (
-          <NavItemButton
-            key={item.path}
-            icon={item.icon}
-            label={item.label}
-            path={item.path}
-            isActive={location.pathname === item.path}
-            onClick={() => onNavigate(item.path)}
-          />
-        ))}
+{/* Bottom items */}
+{bottomItemsI18n.map((item) => (
+  <NavItemButton
+    key={item.path}
+    icon={item.icon}
+    label={item.label}
+    path={item.path}
+    isActive={location.pathname === item.path}
+    onClick={() => onNavigate(item.path)}
+  />
+))}
+
+{/* Paramètres group */}
+{parametresChildrenI18n.length > 0 && (
+  <NavGroupSection
+    group={{
+      icon: Settings,
+      label: "Paramètres",
+      key: "parametres",
+      children: parametresChildrenI18n,
+    }}
+    isOpen={parametresOpen}
+    toggle={() => setParametresOpen(!parametresOpen)}
+    location={location}
+    onNavigate={onNavigate}
+  />
+)}
       </nav>
     </>
   );
@@ -361,11 +410,12 @@ export function MainLayout() {
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                     <h3 className="font-semibold text-gray-900 text-sm">Notifications</h3>
                     <div className="flex items-center gap-2">
-                      {unreadCount > 0 && (
-                        <button onClick={markAllRead} className="text-xs text-blue-600 hover:text-blue-700">
-                          Tout marquer lu
-                        </button>
-                      )}
+                      <button
+                         onClick={markAllRead}
+                         className="text-xs text-blue-600 hover:text-blue-700"
+                          >
+                         Tout marquer lu
+                      </button>
                       <button onClick={() => setNotifOpen(false)}>
                         <X className="w-4 h-4 text-gray-400" />
                       </button>
@@ -375,27 +425,63 @@ export function MainLayout() {
                     {notifications.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-6">Aucune notification</p>
                     ) : (
-                      notifications.slice(0, 8).map(n => (
-                        <button
-                          key={n.id}
-                          onClick={() => markNotificationRead(n.id)}
-                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition border-b border-gray-50 last:border-0 ${!n.read ? "bg-blue-50/40" : ""}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                              n.type === "error" ? "bg-red-500" :
-                              n.type === "warning" ? "bg-orange-500" :
-                              n.type === "success" ? "bg-green-500" : "bg-blue-500"
-                            }`} />
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium ${!n.read ? "text-gray-900" : "text-gray-600"}`}>{n.title}</p>
-                              <p className="text-xs text-gray-500 mt-0.5 truncate">{n.message}</p>
-                              <p className="text-xs text-gray-400 mt-1">{new Date(n.date).toLocaleDateString("fr-FR")}</p>
-                            </div>
-                            {!n.read && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0" />}
-                          </div>
-                        </button>
-                      ))
+                     notifications.slice(0, 8).map(n => (
+  <div
+    key={n.id}
+    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition ${
+      !n.read ? "bg-blue-50/40" : ""
+    }`}
+  >
+    <button
+      onClick={() => markNotificationRead(n.id)}
+      className="flex-1 min-w-0 text-left"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+            n.type === "error"
+              ? "bg-red-500"
+              : n.type === "warning"
+              ? "bg-orange-500"
+              : n.type === "success"
+              ? "bg-green-500"
+              : "bg-blue-500"
+          }`}
+        />
+
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-sm font-medium ${
+              !n.read ? "text-gray-900" : "text-gray-600"
+            }`}
+          >
+            {n.title}
+          </p>
+
+          <p className="text-xs text-gray-500 mt-0.5 truncate">
+            {n.message}
+          </p>
+
+          <p className="text-xs text-gray-400 mt-1">
+            {new Date(n.date).toLocaleDateString("fr-FR")}
+          </p>
+        </div>
+
+        {!n.read && (
+          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
+        )}
+      </div>
+    </button>
+
+    <button
+      onClick={() => deleteNotification(n.id)}
+      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition flex-shrink-0"
+      title="Supprimer"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  </div>
+))
                     )}
                   </div>
                 </div>

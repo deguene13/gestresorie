@@ -37,6 +37,7 @@ export function UserSettings() {
 
   const [djangoUser, setDjangoUser] = useState<DjangoUser | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,6 +75,23 @@ export function UserSettings() {
         );
 
         setDjangoUser(response);
+        const companiesResponse = await apiRequest("/v1/companies/");
+
+console.log(
+  "=== ENTREPRISES DJANGO ===",
+  companiesResponse
+);
+
+console.log(
+  "=== LISTE DES ENTREPRISES ===",
+  companiesResponse?.results
+);
+
+setCompanies(companiesResponse?.results || []);
+        console.log(
+  "=== RESPONSE UTILISATEUR DJANGO ===",
+  response
+);
 
         const djangoCompany = response?.company || null;
 

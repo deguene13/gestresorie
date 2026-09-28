@@ -603,9 +603,9 @@ export function LandingPage() {
               <h4 className="text-white font-semibold text-sm mb-4">Contact</h4>
               <ul className="space-y-3 text-sm" style={{ color: "rgba(227,242,253,0.55)" }}>
                 {[
-                  { icon: "✉", text: "contact@diperflo.sn" },
-                  { icon: "☎", text: "+221 33 800 00 00" },
-                  { icon: "⊙", text: "Dakar, Sénégal" },
+                  { icon: "✉", text: "commercial@bbcons.net" },
+                  { icon: "☎", text: "+221 33 815 78 88" },
+                  { icon: "⊙", text: "Dakar, Rufisque, Cité radieuse lot N° 11" },
                 ].map((c) => (
                   <li key={c.text} className="flex items-center gap-2.5">
                     <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0"

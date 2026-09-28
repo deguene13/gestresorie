@@ -318,6 +318,8 @@ console.log("=== PERMISSION EXECUTION PAIEMENT ===", {
  const [payments, setPayments] = useState<Payment[]>([]);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
+const [currentPage, setCurrentPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
 const [supplierInvoices, setSupplierInvoices] = useState<any[]>([]);
 const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
   const [rejectModal, setRejectModal] = useState<{ id: string; ref: string } | null>(null);
@@ -327,11 +329,14 @@ const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [formData, setFormData] = useState(emptyForm);
   useEffect(() => {
-  loadPayments();
-  loadSupplierInvoices();
-  loadTreasuryAccounts();
-}, []);
 
+  loadPayments();
+
+  loadSupplierInvoices();
+
+  loadTreasuryAccounts();
+
+}, [currentPage]);
 function normalizePaymentStatus(status: string): PaymentStatus {
   const statusMap: Record<string, PaymentStatus> = {
     DRAFT: "created",
@@ -361,9 +366,14 @@ async function loadPayments() {
 
     console.log("=== CHARGEMENT PAIEMENTS FOURNISSEURS DJANGO ===");
 
-    const response = await apiRequest("/v1/payments/");
+   const response = await apiRequest(
+  `/v1/payments/?page=${currentPage}`
+);
 
     console.log("=== REPONSE PAIEMENTS DJANGO ===", response);
+    setTotalPages(
+  response.count ? Math.ceil(response.count / 20) : 1
+);
 
     const data = Array.isArray(response)
       ? response
@@ -973,6 +983,29 @@ try {
               )}
             </tbody>
           </table>
+          <div className="flex items-center justify-between mt-4 p-4 border border-gray-200">
+
+  <button
+    onClick={() => setCurrentPage((page) => page - 1)}
+    disabled={currentPage === 1}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Précédent
+  </button>
+
+  <span className="font-bold">
+    Page {currentPage} sur {totalPages}
+  </span>
+
+  <button
+    onClick={() => setCurrentPage((page) => page + 1)}
+    disabled={currentPage === totalPages}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Suivant
+  </button>
+
+</div>
         </div>
       </div>
 

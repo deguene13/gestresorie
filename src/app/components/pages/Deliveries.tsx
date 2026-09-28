@@ -180,6 +180,8 @@ const getApiResults = <T,>(response: any): T[] => {
 
 export function Deliveries() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -241,11 +243,14 @@ export function Deliveries() {
       setLoadingDeliveries(true);
       setError("");
 
-      console.log("=== CHARGEMENT LIVRAISONS DJANGO ===");
+     
 
-      const response = await apiRequest("/v1/deliveries/");
+     const response = await apiRequest(`/v1/deliveries/?page=${currentPage}`);
 
-      console.log("=== RÉPONSE LIVRAISONS ===", response);
+      
+      setTotalPages(
+  response.count ? Math.ceil(response.count / 20) : 1
+);
 
       const results = getApiResults<Delivery>(response);
 
@@ -294,9 +299,9 @@ export function Deliveries() {
   };
 
   useEffect(() => {
-    loadDeliveries();
-    loadPurchaseOrders();
-  }, []);
+  loadDeliveries();
+  loadPurchaseOrders();
+}, [currentPage]);
 
   // ============================================================
   // BDC RECEVABLES
@@ -771,6 +776,7 @@ export function Deliveries() {
 
   return (
     <div className="space-y-6">
+      
 
       {/* ====================================================== */}
       {/* NOTIFICATIONS */}
@@ -928,6 +934,9 @@ export function Deliveries() {
         </div>
 
       </div>
+      <div className="p-4 bg-red-100 text-red-700 font-bold">
+  TEST PAGINATION
+</div>
 
       {/* ====================================================== */}
       {/* TABLE */}
@@ -1130,9 +1139,30 @@ export function Deliveries() {
             </tbody>
 
           </table>
+<div className="flex items-center justify-between mt-4 p-4 border border-red-500">
+  <button
+    onClick={() => setCurrentPage((page) => page - 1)}
+    disabled={currentPage === 1}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Précédent
+  </button>
 
-        </div>
-      </div>
+  <span className="font-bold">
+    Page {currentPage} sur {totalPages}
+  </span>
+
+  <button
+    onClick={() => setCurrentPage((page) => page + 1)}
+    disabled={currentPage === totalPages}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Suivant
+  </button>
+</div>
+
+</div>
+</div>
 
       {/* ====================================================== */}
       {/* MODAL CRÉATION BL */}

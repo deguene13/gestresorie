@@ -164,6 +164,8 @@ console.log("canValidateDaf :", canValidateDaf);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [showModal, setShowModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -181,7 +183,8 @@ console.log("canValidateDaf :", canValidateDaf);
   // Load purchase orders from shared database (runs on mount + after each modal close)
  const loadOrders = async () => {
   try {
-    const data = await getPurchaseOrders();
+    const data = await getPurchaseOrders(currentPage);
+    
     console.log("=== RÉPONSE BDC DJANGO ===", JSON.stringify(data, null, 2));
     console.log("=== BDC APRÈS REJET ===");
     console.log(JSON.stringify(data, null, 2));
@@ -192,6 +195,7 @@ console.log(
   JSON.stringify(data, null, 2)
 );
 
+setTotalPages(data.count ? Math.ceil(data.count / 20) : 1);
     const dbOrders = data.results ?? [];
     console.log("BDC Django :", data);
    console.log("BDC Django JSON :", JSON.stringify(data, null, 2));
@@ -325,7 +329,7 @@ if (formattedOrders.length > 0) {
 useEffect(() => {
   loadOrders();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [showModal, showDetailModal]);
+}, [showModal, showDetailModal, currentPage]);
 
   const [formData, setFormData] = useState({
     supplier: "",
@@ -1300,8 +1304,31 @@ const handleReject = (id: string, ref: string) => {
               })}
             </tbody>
           </table>
-        </div>
-      </div>
+          
+      <div className="flex items-center justify-between mt-4">
+  <button
+    onClick={() => setCurrentPage((page) => page - 1)}
+    disabled={currentPage === 1}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Précédent
+  </button>
+
+  <span>
+    Page {currentPage} sur {totalPages}
+  </span>
+
+  <button
+    onClick={() => setCurrentPage((page) => page + 1)}
+    disabled={currentPage === totalPages}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Suivant
+  </button>
+</div>
+
+</div>
+</div>
 
       {showModal && (
         <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
