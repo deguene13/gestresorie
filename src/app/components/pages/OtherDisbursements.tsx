@@ -78,13 +78,16 @@ export function OtherDisbursements() {
   const { hasPermission, hasRole } = useAuth();
 
   // RBAC
-  const canCreate   = hasPermission("disbursements:create") || hasPermission("other_disbursements:manage");
-  const canValidate = hasPermission("disbursements:validate");
-  const canExecute  = hasPermission("other_disbursements:manage");
-  const canDelete   = hasRole(["admin"]);
 
- const [disbursements, setDisbursements] = useState<any[]>(initialDisbursements);
-  
+const canCreate = hasPermission("disbursements:create") || hasPermission("other_disbursements:manage");
+
+const canValidate = hasPermission("other_disbursements:validate_dg");
+
+const canExecute = hasPermission("other_disbursements:manage");
+
+const canDelete = hasRole(["admin"]);
+
+const [disbursements, setDisbursements] = useState<any[]>(initialDisbursements);
    useEffect(() => {
   const loadOtherDisbursements = async () => {
     try {
@@ -655,33 +658,37 @@ const handlePay = async (disbursementId: string) => {
                           <FileText className="w-4 h-4" />
                         </button>
                       )}
-                      {canValidate && disbursement.status === "draft" && (
-                        <button
-                          onClick={() => handleApprove(disbursement.id)}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                          title="Valider"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
-                      {canValidate && (disbursement.status === "draft" || disbursement.status === "pending") && (
-                        <button
-                          onClick={() => handleReject(disbursement.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="Rejeter"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      )}
-                      {canExecute && disbursement.status === "approved" && (
-                        <button
-                          onClick={() => handlePay(disbursement.id)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          title="Marquer comme exécuté"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
+                     {canValidate && disbursement.status === "draft" && (
+  <button
+    onClick={() => handleApprove(disbursement.id)}
+    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+    title="Valider"
+  >
+    <CheckCircle className="w-4 h-4" />
+  </button>
+)}
+
+{canValidate &&
+  (disbursement.status === "draft" ||
+    disbursement.status === "pending") && (
+    <button
+      onClick={() => handleReject(disbursement.id)}
+      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+      title="Rejeter"
+    >
+      <XCircle className="w-4 h-4" />
+    </button>
+  )}
+
+{canExecute && disbursement.status === "approved" && (
+  <button
+    onClick={() => handlePay(disbursement.id)}
+    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+    title="Marquer comme exécuté"
+  >
+    <CheckCircle className="w-4 h-4" />
+  </button>
+)}
                       {canDelete && (
                         <button
                           onClick={() => handleDelete(disbursement.id)}

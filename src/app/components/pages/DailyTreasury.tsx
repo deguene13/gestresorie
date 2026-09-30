@@ -14,7 +14,7 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { getPurchaseOrders } from "../../purchaseOrdersApi";
-import { getTreasuryAccounts, getTreasuryTransactions } from "../../data/treasuryData";
+import { getTreasuryAccounts, getTreasuryTransactions, createTreasuryAccount } from "../../data/treasuryData";
 import { apiRequest } from "../../apiClient";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAppData } from "../../context/AppDataContext";
@@ -235,7 +235,6 @@ export function DailyTreasury() {
   bankAccounts,
   selectedAccount,
   setSelectedAccount,
-  addBankAccount,
   updateBankAccount,
   deleteBankAccount,
 } = useAppData();
@@ -1452,7 +1451,7 @@ managerEmail:
               </button>
             </div>
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 // Validation
                const errors: typeof accountFormErrors = {};
@@ -1481,7 +1480,12 @@ const payload = {
   manager_email: accountForm.managerEmail.trim(),
 };
                 if (accountModal === "add") {
-                  addBankAccount(payload);
+                  const createdAccount = await createTreasuryAccount(payload);
+                  const refreshedAccounts = await getTreasuryAccounts();
+                  setTreasuryAccounts(refreshedAccounts);
+                  if (createdAccount?.id) {
+                    setSelectedDjangoAccountId(createdAccount.id);
+                  }
                 } else if (editingAccountId) {
               updateBankAccount(editingAccountId, {
   name: accountForm.name.trim(),

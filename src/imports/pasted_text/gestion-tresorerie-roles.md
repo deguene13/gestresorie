@@ -57,7 +57,7 @@ Responsabilités
 Accès limité
 Uniquement à ses propres documents.
 ________________________________________
-5. Approbateur
+5. Directeur Général
 Mission : Contrôler et valider les opérations.
 Responsabilités
 •	Valider ou rejeter les devis. 
@@ -88,7 +88,7 @@ Responsabilités
 •	Générer les rapports. 
 ________________________________________
 Tableau des droits
-Module	Admin	Gestionnaire d'achat	Fournisseur	Client	Approbateur	Comptable
+Module	Admin	Gestionnaire d'achat	Fournisseur	Client	Directeur Général	Comptable
 Tableau de bord	✅	✅	Consultation	Consultation	✅	✅
 Utilisateurs	✅	❌	❌	❌	❌	❌
 Produits	✅	✅	Consultation	Consultation	Consultation	Consultation
@@ -112,7 +112,7 @@ Gestionnaire d'achat
 Création du Bon de Commande
         │
         ▼
-Approbateur
+Directeur Général
         │
         ├── Refus → Retour au Gestionnaire
         │
@@ -133,7 +133,7 @@ Gestionnaire d'achat
 (Vérification de la conformité)
                 │
                 ▼
-Approbateur
+Directeur Général
 (Validation du paiement)
                 │
                 ▼
@@ -151,7 +151,7 @@ Gestionnaire
 (Création du devis)
         │
         ▼
-Approbateur
+Directeur Général
 (Validation)
         │
         ▼

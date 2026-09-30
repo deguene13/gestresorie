@@ -21,6 +21,7 @@ import { Products } from "./components/pages/Products";
 import { DocumentGenerator } from "./components/pages/DocumentGenerator";
 import { Quotes } from "./components/pages/Quotes";
 import { DailyTreasury } from "./components/pages/DailyTreasury";
+import { TreasuryAccounts } from "./components/pages/TreasuryAccounts";
 import { GlobalTreasury } from "./components/pages/GlobalTreasury";
 import Audit from "./components/pages/Audit";
 import { Companies } from "./components/pages/Companies";
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
   { path: "/forgot-password", element: <ForgotPassword /> },
   { path: "/reset-password", element: <ResetPassword /> },
   { path: "/activate-account", element: <ActivateAccount /> },
+  { path: "/activate-account/", element: <ActivateAccount /> },
   {
     path: "/app",
     element: <MainLayout />,
@@ -65,6 +67,7 @@ export const router = createBrowserRouter([
       { path: "disbursements", element: <OtherDisbursements /> },
       { path: "documents", element: <DocumentGenerator /> },
       { path: "daily-treasury", element: <DailyTreasury /> },
+      { path: "treasury-accounts", element: <TreasuryAccounts /> },
       { path: "global-treasury", element: <GlobalTreasury /> },
       { path: "audit", element: <Audit /> },
       { path: "companies", element: <Companies /> },

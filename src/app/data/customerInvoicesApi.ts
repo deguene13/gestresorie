@@ -1,7 +1,19 @@
 import { apiRequest } from "../apiClient";
 
-export async function getCustomerInvoices() {
-  return await apiRequest("/v1/customer-invoices/");
+export async function getCustomerInvoices(params?: Record<string, string | number | boolean>) {
+  const query = params
+    ? `?${new URLSearchParams(
+        Object.entries(params).reduce(
+          (acc, [key, value]) => {
+            acc[key] = String(value);
+            return acc;
+          },
+          {} as Record<string, string>
+        )
+      ).toString()}`
+    : "";
+
+  return await apiRequest(`/v1/customer-invoices/${query}`);
 }
 
 export async function createCustomerInvoice(data: any) {

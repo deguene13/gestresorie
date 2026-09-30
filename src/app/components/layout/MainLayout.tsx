@@ -30,6 +30,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   BarChart3,
+  Wallet,
   ClipboardList,
   Globe2,
   Users2,
@@ -246,6 +247,7 @@ export function MainLayout() {
     // Espace Fournisseurs est dans la section Achats (achatChildrenI18n)
     { icon: FilePlus,     label: t.nav.documents[lang],   path: "/app/documents",        perm: "documents:view" },
     { icon: BarChart3,    label: t.nav.dailyTreasury[lang],path: "/app/daily-treasury",  perm: "daily_treasury:view" },
+    { icon: Wallet,       label: t.nav.treasuryAccounts[lang], path: "/app/treasury-accounts", perm: "daily_treasury:view" },
     { icon: Globe2,       label: "Trésorerie globale",    path: "/app/global-treasury",  perm: "global_treasury:view" },
     
     
@@ -506,7 +508,6 @@ export function MainLayout() {
                       <p className="text-sm font-semibold text-gray-900">{auth.user.name}</p>
                       <p className="text-xs text-gray-500 capitalize">{
                         auth.user.role === "daf" ? "DAF" :
-                        auth.user.role === "approbateur" ? "Approbateur (DG)" :
                         auth.user.role === "gestionnaire_achats" ? "Gest. Achats" :
                         auth.user.role === "service_commercial" ? "Service Commercial" :
                         auth.user.role.replace("_", " ")

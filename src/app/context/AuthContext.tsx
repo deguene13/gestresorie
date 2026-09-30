@@ -19,7 +19,6 @@ type UserRole =
   | "admin"
   | "comptable"
   | "gestionnaire_achats"
-  | "approbateur"
   | "dg"
   | "daf"
   | "fournisseur"
@@ -95,35 +94,6 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "fournisseurs_espace:view",
   ],
 
-  approbateur: [
-    "dashboard:view",
-    "products:view",
-    "clients:view",
-    "quotes:view",
-    "quotes:validate",
-    "purchase_orders:view",
-    "purchase_orders:validate",
-    "client_orders:view",
-    "client_orders:validate",
-    "supplier_deliveries:view",
-    "supplier_deliveries:validate",
-    "client_deliveries:view",
-    "client_deliveries:validate",
-    "supplier_invoices:view",
-    "supplier_invoices:validate",
-    "client_invoices:view",
-    "client_invoices:validate",
-    "payments:view",
-    "payments:authorize",
-    "client_payments:view",
-    "disbursements:view",
-    "disbursements:validate",
-    "other_disbursements:view",
-    "daily_treasury:view",
-    "global_treasury:view",
-    "documents:view",
-    "reports:export",
-  ],
   dg: [
   "dashboard:view",
   "products:view",
@@ -147,6 +117,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   "other_disbursements:view",
   "other_disbursements:validate_dg",
   "other_collections:view",
+  "other_collections:validate_dg",
   "daily_treasury:view",
   "global_treasury:view",
   "documents:view",
@@ -200,13 +171,24 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "quotes:view",
     "quotes:create",
     "quotes:edit",
+    "quotes:validate",
     "quotes:send",
     "client_orders:view",
     "client_orders:create",
     "client_orders:edit",
     "client_deliveries:view",
     "client_deliveries:create",
+    "client_deliveries:edit",
+    "client_deliveries:delete",
+    "client_invoices:send",
+    "client_deliveries:validate",
+    "client_deliveries:reject",
     "client_invoices:view",
+    "client_invoices:create",
+    "client_invoices:edit",
+    "client_invoices:delete",
+    "client_invoices:validate",
+    "client_invoices:reject",
     "client_payments:view",
     "other_collections:view",
     "clients:view",
@@ -276,10 +258,6 @@ function mapDjangoRole(role: string): UserRole {
     case "PURCHASING":
       return "gestionnaire_achats";
 
-   case "APPROBATEUR":
-case "APPROVER":
-  return "approbateur";
-
 case "DG":
   return "dg";
 
@@ -295,6 +273,7 @@ case "DG":
     case "SERVICE_COMMERCIAL":
     case "COMMERCIAL":
     case "SALES":
+    case "SALE_MANAGER":
     case "SALES_MANAGER":
       return "service_commercial";
 

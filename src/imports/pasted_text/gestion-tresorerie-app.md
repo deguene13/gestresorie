@@ -37,7 +37,7 @@ MODULE 1: USER MANAGEMENT
   * Admin
   * Procurement Manager
   * Accountant
-  * Approver
+  * General Manager
   * Supplier
 
 * Features:

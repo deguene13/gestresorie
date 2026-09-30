@@ -532,16 +532,23 @@ console.log(
     setFormItems([emptyItem()]);
   };
 
-  const handleValidate = async (delivery: SupplierDelivery) => {
-    if (delivery.status === "rejected") {
-  alert("Cette livraison a été rejetée et ne peut pas être validée directement.");
-  return;
-}
+ const handleValidate = async (delivery: SupplierDelivery) => {
+  if (delivery.status === "rejected") {
+    alert(
+      "Cette livraison a été rejetée et ne peut pas être validée directement."
+    );
+    return;
+  }
+
   console.log("=== VALIDATION LIVRAISON ===");
   console.log("ID DJANGO :", delivery.id);
   console.log("RÉFÉRENCE :", delivery.reference);
 
   try {
+    // =====================================================
+    // 1. VALIDER LE BL
+    // =====================================================
+
     const response = await apiRequest(
       `/v1/deliveries/${delivery.id}/validate/`,
       {
@@ -553,32 +560,141 @@ console.log(
     );
 
     console.log(
-      "=== RÉPONSE VALIDATION LIVRAISON DJANGO ===",
-      response
+      "=== RÉPONSE VALIDATION LIVRAISON DJANGO ==="
+    );
+    console.log(JSON.stringify(response, null, 2));
+
+    if (
+      response.status !== "VALIDATED" &&
+      response.status !== "COMPLETED"
+    ) {
+      throw new Error(
+        "Le BL n'a pas été validé par Django."
+      );
+    }
+
+    // =====================================================
+    // 2. VÉRIFIER LES ARTICLES REÇUS
+    // =====================================================
+
+    const validItems = response.items.filter(
+      (item: any) =>
+        Number(item.quantity_received) > 0
     );
 
-    setDeliveries((prev) =>
-  prev.map((d) =>
-    d.id === delivery.id
-      ? {
-          ...d,
-          status:
-            response.status === "VALIDATED" ||
-            response.status === "COMPLETED"
-              ? "complete"
-              : d.status,
-        }
-      : d
-  )
-);
+    if (validItems.length === 0) {
+      throw new Error(
+        "Aucun article avec une quantité reçue supérieure à 0."
+      );
+    }
 
+    // =====================================================
+    // 3. DATE DE FACTURE ET ÉCHÉANCE
+    // =====================================================
+
+    const invoiceDate = new Date()
+      .toISOString()
+      .split("T")[0];
+
+    const dueDate = new Date(
+      Date.now() + 30 * 24 * 60 * 60 * 1000
+    )
+      .toISOString()
+      .split("T")[0];
+
+    // =====================================================
+    // 4. RÉFÉRENCE FACTURE
+    // =====================================================
+
+    const invoiceNumber =
+      `FAC-${new Date().getFullYear()}-${Date.now()
+        .toString()
+        .slice(-6)}`;
+
+    // =====================================================
+    // 5. PRÉPARER LES LIGNES
+    // =====================================================
+
+    const lines = validItems.map((item: any) => ({
+      product: item.product,
+      designation:
+        item.product_detail?.name || "",
+      quantity: Number(item.quantity_received),
+      unit_price: Number(
+        item.product_detail?.unit_price || 0
+      ),
+    }));
+
+    // =====================================================
+    // 6. PRÉPARER LA FACTURE
+    // =====================================================
+
+    const invoicePayload: any = {
+      invoice_number: invoiceNumber,
+      supplier: response.supplier,
+      purchase_order: response.purchase_order,
+      delivery: response.id,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      currency: "XOF",
+      tva_percent: "18.00",
+      notes: response.notes || "",
+      lines,
+    };
+
+    console.log(
+      "=== CRÉATION FACTURE FOURNISSEUR ==="
+    );
+    console.log(
+      JSON.stringify(invoicePayload, null, 2)
+    );
+
+    // =====================================================
+    // 7. CRÉER LA FACTURE
+    // =====================================================
+
+    const invoiceResponse = await apiRequest(
+      "/v1/invoices/supplier/",
+      {
+        method: "POST",
+        body: JSON.stringify(invoicePayload),
+      }
+    );
+
+    console.log(
+      "=== FACTURE FOURNISSEUR CRÉÉE ==="
+    );
+    console.log(
+      JSON.stringify(invoiceResponse, null, 2)
+    );
+
+    // =====================================================
+    // 8. METTRE À JOUR LE BL
+    // =====================================================
+
+    setDeliveries((prev) =>
+      prev.map((d) =>
+        d.id === delivery.id
+          ? {
+              ...d,
+              status: "complete",
+            }
+          : d
+      )
+    );
+
+    alert(
+      `Le BL ${delivery.reference} a été validé et la facture ${invoiceNumber} a été créée.`
+    );
   } catch (error) {
     console.error(
-      "=== ERREUR VALIDATION LIVRAISON ===",
+      "=== ERREUR VALIDATION / FACTURE ===",
       error
     );
 
-    alert("Impossible de marquer cette livraison comme complète.");
+    alert(
+      "Le BL a été validé, mais la facture fournisseur n'a pas pu être créée."
+    );
   }
 };
 
@@ -1090,7 +1206,9 @@ console.log(
           <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl text-gray-900">Détails BL — {selectedDelivery.id}</h2>
+                <h2 className="text-xl text-gray-900">
+                   Détails BL — {selectedDelivery.reference}
+                </h2>
                 <p className="text-sm text-gray-500 mt-0.5">Bon de livraison fournisseur</p>
               </div>
               <button onClick={() => setShowDetailModal(false)}>

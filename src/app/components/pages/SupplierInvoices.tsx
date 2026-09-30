@@ -234,13 +234,13 @@ const canValidateStep2 =
   hasRole(["daf", "admin"]);
 
 const canValidateStep3 =
-  hasRole(["approbateur", "admin"]);
+  hasRole(["dg", "admin"]);
 
 const canReject =
   hasRole([
     "daf",
     "comptable",
-    "approbateur",
+    "dg",
     "admin",
   ]);
 
@@ -257,6 +257,8 @@ const isViewOnly =
   const [currentPage, setCurrentPage] = useState(1);
 const [totalPages, setTotalPages] = useState(1);
   const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [validatedDeliveries, setValidatedDeliveries] = useState<any[]>([]);
+  const [invoicedDeliveryIds, setInvoicedDeliveryIds] = useState<string[]>([]);
 const mapDjangoInvoice = (invoice: any): Invoice => {
   console.log("=== DONNÉES REJET FACTURE DJANGO ===", {
   id: invoice.id,
@@ -451,6 +453,74 @@ useEffect(() => {
   loadSuppliers();
 }, []);
 
+useEffect(() => {
+  const loadValidatedDeliveries = async () => {
+    try {
+      console.log("=== CHARGEMENT BL VALIDÉS DJANGO ===");
+
+      const data = await apiRequest("/v1/deliveries/");
+
+      const results = Array.isArray(data)
+        ? data
+        : data?.results ?? [];
+
+      console.log("=== TOUS LES BL ===");
+      console.log(results);
+
+      const validated = results.filter(
+        (delivery: any) =>
+          delivery.status === "VALIDATED" ||
+          delivery.status === "COMPLETED"
+      );
+
+      console.log("=== BL VALIDÉS ===");
+      console.log(validated);
+
+      setValidatedDeliveries(validated);
+    } catch (error) {
+      console.error(
+        "=== ERREUR CHARGEMENT BL VALIDÉS ===",
+        error
+      );
+    }
+  };
+
+  loadValidatedDeliveries();
+}, []);
+
+useEffect(() => {
+  const loadInvoicedDeliveries = async () => {
+    try {
+      console.log("=== CHARGEMENT BL DÉJÀ FACTURÉS ===");
+
+      const data = await apiRequest("/v1/invoices/supplier/");
+
+      const results = Array.isArray(data)
+        ? data
+        : data?.results ?? [];
+
+      console.log("=== FACTURES EXISTANTES ===");
+      console.log(results);
+
+      const deliveryIds = results
+        .map((invoice: any) => invoice.delivery)
+        .filter(Boolean);
+
+      console.log("=== BL DÉJÀ FACTURÉS ===");
+      console.log(deliveryIds);
+
+      setInvoicedDeliveryIds(deliveryIds);
+    } catch (error) {
+      console.error(
+        "=== ERREUR CHARGEMENT BL DÉJÀ FACTURÉS ===",
+        error
+      );
+    }
+  };
+
+  loadInvoicedDeliveries();
+}, []);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -474,14 +544,15 @@ const [selectedDeliveryId, setSelectedDeliveryId] = useState<string>("");
 
   const [formLocked, setFormLocked] = useState(false);
   const [formData, setFormData] = useState({
-    supplier: "",
-    supplierRef: "",
-    bdcRef: "",
-    blRef: "",
-    issueDate: today,
-    dueDate: "",
-    tvaRate: 18,
-  });
+  supplier: "",
+  supplierRef: "",
+  bdcRef: "",
+  blRef: "",
+  invoiceNumber: "",
+  issueDate: today,
+  dueDate: "",
+  tvaRate: 18,
+});
 
   const [formItems, setFormItems] = useState<InvoiceItem[]>([
     { id: 1, designation: "", quantity: 1, unitPrice: 0 },
@@ -519,9 +590,110 @@ const [selectedDeliveryId, setSelectedDeliveryId] = useState<string>("");
   const handleFormItemChange = (id: number, field: string, value: any) => {
     setFormItems(formItems.map(i => i.id === id ? { ...i, [field]: value } : i));
   };
+  const handleDeliverySelect = async (deliveryId: string) => {
+  console.log("=== BL SÉLECTIONNÉ ===");
+  console.log("BL ID :", deliveryId);
+
+  setSelectedDeliveryId(deliveryId);
+
+  if (!deliveryId) {
+    setSelectedPurchaseOrderId("");
+    setSelectedSupplierRef("");
+    setFormLocked(false);
+
+    setFormData((prev) => ({
+      ...prev,
+      supplier: "",
+      supplierRef: "",
+      bdcRef: "",
+      blRef: "",
+    }));
+
+    setFormItems([
+      {
+        id: 1,
+        designation: "",
+        quantity: 1,
+        unitPrice: 0,
+      },
+    ]);
+
+    return;
+  }
+
+  const delivery = validatedDeliveries.find(
+    (item: any) => item.id === deliveryId
+  );
+
+  if (!delivery) {
+    console.error("=== BL INTROUVABLE ===");
+    return;
+  }
+
+  console.log("=== BL TROUVÉ ===");
+  console.log(delivery);
+
+  setSelectedSupplierRef(delivery.supplier || "");
+  setSelectedPurchaseOrderId(delivery.purchase_order || "");
+
+ setFormData((prev) => ({
+  ...prev,
+  supplier:
+    delivery.supplier_detail?.raison_sociale ||
+    delivery.supplier ||
+    "",
+  supplierRef:
+    delivery.supplier_detail?.ninea ||
+    "",
+  bdcRef:
+    delivery.purchase_order_reference ||
+    "",
+  blRef:
+    delivery.reference ||
+    "",
+  invoiceNumber: generateInvoiceNumber(
+  delivery.reference || ""
+),
+}));
+
+  const deliveryItems = (delivery.items || []).map(
+    (item: any, index: number) => ({
+      id: index + 1,
+      designation:
+        item.product_detail?.name ||
+        item.designation ||
+        "",
+      quantity: Number(item.quantity_received || 0),
+      unitPrice: Number(
+        item.product_detail?.unit_price ||
+        item.unit_price ||
+        0
+      ),
+    })
+  );
+
+  console.log("=== ARTICLES DU BL ===");
+  console.log(deliveryItems);
+
+  setFormItems(
+    deliveryItems.length > 0
+      ? deliveryItems
+      : [
+          {
+            id: 1,
+            designation: "",
+            quantity: 1,
+            unitPrice: 0,
+          },
+        ]
+  );
+
+  setFormLocked(true);
+};
 
   // Supplier auto-fill
 const handleSupplierSelect = async (id: string) => {
+
   setSelectedSupplierRef(id);
 
   if (!id) {
@@ -675,6 +847,12 @@ console.log(newFormItems);
   setFormLocked(true);
 };
 
+
+const generateInvoiceNumber = (deliveryReference: string) => {
+  const blNumber = deliveryReference.replace("BL-", "");
+
+  return `FAC-${blNumber}`;
+};
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
@@ -717,6 +895,16 @@ const lines = formItems.map((item) => ({
   quantity: Number(item.quantity),
   unit_price: Number(item.unitPrice),
 }));
+const hasInvalidQuantity = lines.some(
+  (line) => line.quantity <= 0
+);
+
+if (hasInvalidQuantity) {
+  alert(
+    "Impossible de créer la facture : une ou plusieurs lignes ont une quantité reçue nulle."
+  );
+  return;
+}
 
 console.log("=== LIGNES FACTURE DJANGO ===");
 console.log(lines);
@@ -736,7 +924,7 @@ console.log("BL ID :", selectedDeliveryId);
 console.log("Fournisseur Django :", djangoSupplier);
 
 const payload = {
-  invoice_number: formData.bdcRef,
+  invoice_number: formData.invoiceNumber,
   supplier: selectedSupplierRef,
   purchase_order: selectedPurchaseOrderId,
   delivery: selectedDeliveryId,
@@ -775,8 +963,13 @@ console.log("delivery :", selectedDeliveryId);
   );
 
   console.log("=== FACTURE CRÉÉE DANS DJANGO ===");
-  console.log(response);
-  const refreshedData = await apiRequest("/v1/invoices/supplier/");
+
+console.log(response);
+
+const refreshedData = await apiRequest("/v1/invoices/supplier/");
+
+console.log("=== FACTURES EXISTANTES APRÈS RECHARGEMENT ===");
+console.log(refreshedData);
 
 const refreshedResults = Array.isArray(refreshedData)
   ? refreshedData
@@ -797,7 +990,16 @@ setInvoices(refreshedInvoices);
   const resetForm = () => {
     setSelectedSupplierRef("");
     setFormLocked(false);
-    setFormData({ supplier: "", supplierRef: "", bdcRef: "", blRef: "", issueDate: today, dueDate: "", tvaRate: 18 });
+   setFormData({
+  supplier: "",
+  supplierRef: "",
+  bdcRef: "",
+  blRef: "",
+  invoiceNumber: "",
+  issueDate: today,
+  dueDate: "",
+  tvaRate: 18
+});
    
   };
 
@@ -894,11 +1096,64 @@ return {
   };
 };
   // ---------- action handlers ----------
-  const handleValidate = async (invoiceId: string) => {
+
+// ---------- action handlers ----------
+const handleValidate = async (invoiceId: string) => {
   try {
     console.log("=== VALIDATION COMPTABLE ===");
     console.log("Invoice ID :", invoiceId);
-    
+
+    const invoice = invoices.find(
+      (item) => item.id === invoiceId
+    );
+
+    console.log("=== FACTURE À VALIDER ===");
+    console.log(invoice);
+
+    console.log("=== ID FACTURE ===", invoice?.id);
+    console.log(
+      "=== BDC ID ===",
+      invoice?.purchase_order
+    );
+    console.log(
+      "=== BL ID ===",
+      invoice?.delivery
+    );
+    console.log(
+      "=== FOURNISSEUR ID ===",
+      invoice?.supplier
+    );
+    console.log("=== LIGNES FACTURE ===", invoice?.lines);
+    const purchaseOrder = await apiRequest(
+  `/v1/purchase-orders/${invoice?.purchase_order}/`
+);
+
+console.log("=== BDC CORRESPONDANT ===");
+console.log(purchaseOrder);
+
+console.log(
+  "=== MONTANT BDC ===",
+  purchaseOrder?.total_amount
+);
+
+console.log(
+  "=== TVA BDC ===",
+  purchaseOrder?.tva_percent
+);
+
+console.log(
+  "=== LIGNES BDC ===",
+  purchaseOrder?.items
+);
+
+invoice?.lines?.forEach((line: any, index: number) => {
+  console.log(`=== LIGNE FACTURE ${index + 1} ===`);
+  console.log("Désignation :", line.designation);
+  console.log("Quantité :", line.quantity);
+  console.log("Prix unitaire :", line.unit_price);
+  console.log("Produit :", line.product);
+  console.log("Détail produit :", line.product_detail);
+});
 
     const response = await apiRequest(
       `/v1/invoices/supplier/${invoiceId}/validate-accountant/`,
@@ -915,7 +1170,9 @@ return {
 
     setInvoices((prev) =>
       prev.map((invoice) =>
-        invoice.id === invoiceId ? mapDjangoInvoice(response) : invoice
+        invoice.id === invoiceId
+          ? mapDjangoInvoice(response)
+          : invoice
       )
     );
 
@@ -930,6 +1187,7 @@ return {
     alert("Erreur lors de la validation Comptable.");
   }
 };
+
 
 const handleApproveDaf = async (invoiceId: string) => {
   try {
@@ -1317,8 +1575,8 @@ const handleApproveDaf = async (invoiceId: string) => {
 
       {/* New Invoice Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-3xl w-full p-6 my-8">
+        <div className="fixed inset-0 bg-gray-900/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+         <div className="bg-white rounded-xl max-w-3xl w-full p-4 sm:p-6 my-4 sm:my-8 max-h-[calc(100vh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl text-gray-900">Nouvelle facture fournisseur</h2>
               <button onClick={() => { setShowModal(false); resetForm(); }}>
@@ -1328,20 +1586,28 @@ const handleApproveDaf = async (invoiceId: string) => {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Supplier selector */}
               <div>
-                <label className="block text-sm text-gray-700 mb-1">Sélectionner un fournisseur</label>
+               <label className="block text-sm text-gray-700 mb-1">
+                 Référence BL
+             </label>
                 <div className="flex gap-2">
-                  <select
-                    value={selectedSupplierRef}
-                    onChange={(e) => handleSupplierSelect(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                  >
-                    <option value="">— Choisir un fournisseur —</option>
-                      {suppliers.map((supplier: any) => (
-                      <option key={supplier.id} value={supplier.id}>
-                      {supplier.raison_sociale}
-                    </option>
-                      ))}
-                  </select>
+                 <select
+  value={selectedDeliveryId}
+  onChange={(e) => handleDeliverySelect(e.target.value)}
+  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+>
+  <option value="">— Choisir un BL validé —</option>
+
+  {validatedDeliveries
+  .filter(
+    (delivery: any) =>
+      !invoicedDeliveryIds.includes(delivery.id)
+  )
+  .map((delivery: any) => (
+    <option key={delivery.id} value={delivery.id}>
+      {delivery.reference}
+    </option>
+  ))}
+</select>
                   {formLocked && (
                     <button
                       type="button"
@@ -1409,6 +1675,23 @@ const handleApproveDaf = async (invoiceId: string) => {
                   />
                   
                 </div>
+                <div>
+  <label className="block text-sm text-gray-700 mb-1">
+    N° facture fournisseur
+  </label>
+  <input
+    type="text"
+    value={formData.invoiceNumber}
+    onChange={(e) =>
+      setFormData({ ...formData, invoiceNumber: e.target.value })
+    }
+    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+      formLocked ? "bg-gray-50 text-gray-500" : ""
+    }`}
+    placeholder="Ex: FAC-FOUR-2026-001"
+    readOnly={formLocked}
+  />
+</div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>

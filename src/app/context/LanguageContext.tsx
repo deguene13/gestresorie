@@ -77,6 +77,7 @@ const translations = {
     disbursements:     { fr: "Autres décaissements",   en: "Other Disbursements" },
     documents:         { fr: "Liasse comptable",        en: "Accounting File" },
     dailyTreasury:     { fr: "Trésorerie journalière", en: "Daily Treasury" },
+    treasuryAccounts:  { fr: "Comptes",                en: "Accounts" },
     settings:          { fr: "Paramètres",             en: "Settings" },
     logout:            { fr: "Se déconnecter",         en: "Log out" },
   },

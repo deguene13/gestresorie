@@ -210,7 +210,7 @@ Je souhaite que tous les profils puissent se connecter selon leurs droits :
 Administrateur
 Comptable
 Gestionnaire des achats
-Approbateur
+Directeur Général
 
 Chaque utilisateur doit :
 

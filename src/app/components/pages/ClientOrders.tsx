@@ -75,8 +75,6 @@ export function ClientOrders() {
       case "VALIDATED":
         return "Validé";
 
-      case "DELIVERED":
-        return "Livré";
 
       case "CANCELLED":
         return "Annulé";
@@ -221,8 +219,8 @@ return (
             Articles
           </h3>
 
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border rounded-xl overflow-auto max-h-[600px]">
+            <table className="w-full min-w-[1200px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="text-left px-4 py-3">
@@ -471,52 +469,11 @@ return (
 }}
             className="w-full px-4 py-3 text-left rounded-lg border border-gray-200 hover:bg-gray-50"
           >
-            En livraison
+            Brouillon
           </button>
 
-          <button
-            onClick={async () => {
-  try {
-    console.log("=== BDC CLIENT LIVRÉ DJANGO ===");
-    console.log("ID BDC :", statusOrder.id);
-    console.log("Référence :", statusOrder.reference);
-
-    const result = await apiRequest(
-      `/v1/customer-orders/${statusOrder.id}/mark-delivered/`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          comment: "Bon de commande livré.",
-        }),
-      }
-    );
-
-    console.log("=== RÉPONSE DJANGO LIVRAISON ===");
-    console.log(result);
-
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === statusOrder.id
-          ? {
-              ...order,
-              status: "DELIVERED",
-            }
-          : order
-      )
-    );
-
-    setStatusOrder(null);
-  } catch (error) {
-    console.error(
-      "=== ERREUR LIVRAISON BDC CLIENT DJANGO ===",
-      error
-    );
-  }
-}}
-            className="w-full px-4 py-3 text-left rounded-lg border border-gray-200 hover:bg-gray-50"
-          >
-            Livré
-          </button>
+         
+         
 
          <button
   type="button"
@@ -625,13 +582,7 @@ try {
     </p>
   </div>
 
-  {/* Livrés */}
-  <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-    <p className="text-sm text-gray-500">Livrés</p>
-    <p className="text-2xl font-bold text-green-600 mt-1">
-      {livres}
-    </p>
-  </div>
+  
 
 </div>
 <div className="mt-6">
@@ -675,8 +626,12 @@ try {
                   Statut
                 </th>
                  <th className="text-center px-5 py-3 font-semibold text-gray-700">
+                  Voir détail
+                </th>
+                 <th className="text-center px-5 py-3 font-semibold text-gray-700">
                   Actions
                 </th>
+                
                       
               </tr>
             </thead>
@@ -739,23 +694,25 @@ try {
                   {/* Actions */}
 <td className="px-5 py-4">
   <div className="flex items-center gap-3">
-   <button
-  onClick={() => {
-    console.log("=== DÉTAIL BDC CLIENT ===");
-    console.log(order);
-    setDetailOrder(order);
-  }}
-  className="text-blue-600 hover:text-blue-800 font-medium"
->
-  Voir détail
-</button>
-
     <button
-      onClick={() => setStatusOrder(order)}
-      className="text-gray-600 hover:text-gray-900 font-medium"
+      onClick={() => {
+        console.log("=== DÉTAIL BDC CLIENT ===");
+        console.log(order);
+        setDetailOrder(order);
+      }}
+      className="text-blue-600 hover:text-blue-800 font-medium"
     >
-      Modifier le statut
+      Voir détail
     </button>
+
+    {order.status === "DELIVERED" && (
+      <button
+        onClick={() => setStatusOrder(order)}
+        className="text-gray-600 hover:text-gray-900 font-medium"
+      >
+        Modifier le statut
+      </button>
+    )}
   </div>
 </td>
                 </tr>

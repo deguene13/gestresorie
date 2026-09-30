@@ -539,7 +539,10 @@ useEffect(() => {
 
      const data = await getCustomerQuotes();
 
-console.log("=== DEVIS CLIENTS DJANGO RÉSULTATS ===", data);
+console.log(
+  "=== DEVIS CLIENTS DJANGO RÉPONSE COMPLÈTE ===",
+  JSON.stringify(data, null, 2)
+);
 
 const mappedQuotes = data.map(mapDjangoQuoteToQuote);
 
@@ -1469,7 +1472,7 @@ console.log(
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold text-gray-900">Devis {selected.id}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Devis {selected.reference}</h2>
                 <Badge status={selected.status} />
                 {selected.linkedPurchaseOrderId && (
                   <span className="text-xs bg-green-100 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
@@ -1589,7 +1592,7 @@ console.log(
             <div className="flex items-center justify-between mb-4 print:hidden">
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Aperçu document</p>
-                <h2 className="text-xl font-semibold text-white">Devis {selected.id} — {selected.clientName}</h2>
+                <h2 className="text-xl font-semibold text-white">Devis {selected.reference} — {selected.clientName}</h2>
               </div>
               <button onClick={goList}
                 className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition">

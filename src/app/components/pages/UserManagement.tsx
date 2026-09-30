@@ -8,10 +8,9 @@ const roles = [
   { label: "Admin", value: "ADMIN" },
   { label: "DG", value: "DG" },
   { label: "DAF", value: "DAF" },
-  { label: "Approbateur (DG)", value: "APPROVER" },
   { label: "Comptable", value: "ACCOUNTANT" },
   { label: "Gestionnaire achats", value: "PURCHASING_MANAGER" },
-  { label: "Responsable Réception", value: "RECEPTION_MANAGER" },
+  { label: "Service Commercial", value: "SALE_MANAGER" },
   { label: "Fournisseur", value: "SUPPLIER" },
 ];
 
@@ -44,7 +43,7 @@ const initialUsers = [
     id: 4,
     name: "Sophie Lefebvre",
     email: "sophie.lefebvre@entreprise.fr",
-    role: "Approbateur (DG)",
+    role: "DG",
     status: "inactive",
     lastLogin: "2026-04-15",
   },
@@ -83,14 +82,13 @@ const getRoleLabel = (role: string) => {
       return "Directeur Général";
     case "DAF":
       return "Directeur Administratif et Financier";
-    case "APPROVER":
-      return "Approbateur";
     case "ACCOUNTANT":
       return "Comptable";
     case "PURCHASING_MANAGER":
       return "Gestionnaire achats";
-    case "RECEPTION_MANAGER":
-      return "Responsable Réception";
+    case "SALE_MANAGER":
+    case "SALES_MANAGER":
+      return "Service Commercial";
     case "SUPPLIER":
       return "Fournisseur";
     case "CUSTOMER":
@@ -228,14 +226,14 @@ const last_name = formData.last_name.trim();
     ? "DG"
     : formData.role === "DAF" || formData.role === "Directeur Administratif et Financier"
     ? "DAF"
-    : formData.role === "Approbateur (DG)" || formData.role === "APPROVER"
-    ? "APPROVER"
     : formData.role === "Comptable" || formData.role === "ACCOUNTANT"
     ? "ACCOUNTANT"
     : formData.role === "Gestionnaire achats" || formData.role === "PURCHASING_MANAGER"
     ? "PURCHASING_MANAGER"
-    : formData.role === "Responsable Réception" || formData.role === "RECEPTION_MANAGER"
-    ? "RECEPTION_MANAGER"
+    : formData.role === "Service Commercial" ||
+      formData.role === "SALE_MANAGER" ||
+      formData.role === "SALES_MANAGER"
+    ? "SALE_MANAGER"
     : formData.role,
   phone: selectedUser.phone || "",
   is_active: selectedUser.status === "active",
@@ -380,12 +378,31 @@ console.log(
    });
 
     console.log("=== UTILISATEUR AJOUTÉ AU FRONTEND ===");
-  } catch (error) {
-    console.error(
-      "=== ERREUR CRÉATION/MODIFICATION UTILISATEUR ===",
-      error
+  } catch (error: any) {
+  console.error(
+    "=== ERREUR CRÉATION/MODIFICATION UTILISATEUR ===",
+    error
+  );
+
+  const errorMessage =
+    error?.details?.email?.[0] ||
+    error?.message ||
+    "";
+
+  if (errorMessage.includes("déjà utilisé")) {
+    alert(
+      lang === "fr"
+        ? "Cette adresse email est déjà utilisée par un autre utilisateur."
+        : "This email address is already used by another user."
+    );
+  } else {
+    alert(
+      lang === "fr"
+        ? "Une erreur est survenue lors de l'enregistrement de l'utilisateur."
+        : "An error occurred while saving the user."
     );
   }
+}
 };
 
  const handleDelete = async (id: string) => {
@@ -547,14 +564,12 @@ console.log(
       ? "bg-indigo-100 text-indigo-700"
       : user.role === "Directeur Administratif et Financier"
       ? "bg-violet-100 text-violet-700"
-      : user.role === "Approbateur"
-      ? "bg-purple-100 text-purple-700"
       : user.role === "Comptable"
       ? "bg-blue-100 text-blue-700"
       : user.role === "Gestionnaire achats" ||
         user.role === "Responsable des achats"
       ? "bg-green-100 text-green-700"
-      : user.role === "Responsable Réception"
+      : user.role === "Service Commercial"
       ? "bg-yellow-100 text-yellow-700"
       : user.role === "Fournisseur" ||
         user.role === "FOURNISSEUR"

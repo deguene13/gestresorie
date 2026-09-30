@@ -147,12 +147,15 @@ export function PurchaseOrders() {
   const { hasPermission, hasRole, user } = useAuth();
   const { addNotification, addAuditEntry } = useAppData();
   const canCreate      = hasPermission("purchase_orders:create");
-  const canEdit        = hasPermission("purchase_orders:edit");
-  const canValidate    = hasPermission("purchase_orders:validate");
-  const canValidateDaf = hasPermission("purchase_orders:validate_daf");
+const canEdit        = hasPermission("purchase_orders:edit");
+const canValidate    = hasPermission("purchase_orders:validate_dg");
+const canValidateDaf = hasPermission("purchase_orders:validate_daf");
 
 console.log("=== PERMISSIONS BDC ===");
 console.log("Utilisateur :", user);
+console.log("=== PERMISSIONS UTILISATEUR ===");
+console.log("Role :", user?.role);
+console.log("Permissions :", user?.permissions);
 console.log("canCreate :", canCreate);
 console.log("canEdit :", canEdit);
 console.log("canValidate :", canValidate);
@@ -1154,14 +1157,11 @@ const handleReject = (id: string, ref: string) => {
                       {order.supplier}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {Array.isArray(order.items)
-                        ? order.items.reduce(
-                          (total: number, item: { quantity: string | number }) =>
-                            total + Number(item.quantity || 0),
-                        0
-                        )
-                         : 0} articles
-                    </td>
+  {Array.isArray(order.items) ? order.items.length : 0}{" "}
+  {Array.isArray(order.items) && order.items.length > 1
+    ? "articles"
+    : "article"}
+</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {Number(order.totalAmount ?? 0).toLocaleString()} FCFA
                     </td>
@@ -1557,7 +1557,7 @@ const handleReject = (id: string, ref: string) => {
         <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl text-gray-900">Détails du BDC - {selectedOrder.id}</h2>
+              <h2 className="text-xl text-gray-900">Détails du BDC - {selectedOrder.reference}</h2>
               <button onClick={() => setShowDetailModal(false)}>
                 <X className="w-6 h-6 text-gray-400 hover:text-gray-600" />
               </button>

@@ -19,9 +19,21 @@ import { useAuth } from "../../context/AuthContext";
 import { useAppData } from "../../context/AppDataContext";
 import { RejectModal } from "../shared/RejectModal";
 import { apiRequest } from "../../apiClient";
+import { createTreasuryAccount } from "../../data/treasuryData";
 
 
 type MoyenPaiement = "cheque" | "virement" | "traite" | "ordre_transfert";
+type TreasuryAccountType = "BANK" | "MOBILE_MONEY" | "CASH";
+
+type TreasuryAccountForm = {
+  name: string;
+  accountType: TreasuryAccountType;
+  accountNumber: string;
+  managerName: string;
+  managerPhone: string;
+  managerEmail: string;
+  openingBalance: number;
+};
 type PaymentStatus =
   | "created"
   | "pending_validation"
@@ -322,6 +334,17 @@ const [currentPage, setCurrentPage] = useState(1);
 const [totalPages, setTotalPages] = useState(1);
 const [supplierInvoices, setSupplierInvoices] = useState<any[]>([]);
 const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const [accountForm, setAccountForm] = useState<TreasuryAccountForm>({
+    name: "",
+    accountType: "BANK",
+    accountNumber: "",
+    managerName: "",
+    managerPhone: "",
+    managerEmail: "",
+    openingBalance: 0,
+  });
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const [rejectModal, setRejectModal] = useState<{ id: string; ref: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -509,11 +532,60 @@ async function loadTreasuryAccounts() {
     );
 
     setTreasuryAccounts(data);
+    return data;
   } catch (err: any) {
     console.error(
       "=== ERREUR CHARGEMENT COMPTES DE TRESORERIE ===",
       err
     );
+  }
+}
+
+async function handleCreateTreasuryAccount() {
+  if (
+    !accountForm.name.trim() ||
+    !accountForm.managerName.trim() ||
+    !accountForm.managerPhone.trim() ||
+    !accountForm.managerEmail.trim()
+  ) return;
+
+  try {
+    setCreatingAccount(true);
+    const account = await createTreasuryAccount({
+      name: accountForm.name.trim(),
+      account_type: accountForm.accountType,
+      account_number: accountForm.accountNumber.trim(),
+      bank_name: "",
+      currency: "XOF",
+      opening_balance: accountForm.openingBalance,
+      is_active: true,
+      manager_name: accountForm.managerName.trim(),
+      manager_phone: accountForm.managerPhone.trim(),
+      manager_email: accountForm.managerEmail.trim(),
+    });
+
+    const refreshedAccounts = await loadTreasuryAccounts();
+    const accountId =
+      account?.id ??
+      account?.account?.id ??
+      refreshedAccounts.find((item: any) => item.name === accountForm.name.trim())?.id;
+    if (accountId) {
+      setFormData((current) => ({ ...current, treasuryAccountId: accountId }));
+    }
+    setAccountForm({
+      name: "",
+      accountType: "BANK",
+      accountNumber: "",
+      managerName: "",
+      managerPhone: "",
+      managerEmail: "",
+      openingBalance: 0,
+    });
+    setShowAccountForm(false);
+  } catch (accountError: any) {
+    alert(accountError?.message || "Impossible de créer le compte.");
+  } finally {
+    setCreatingAccount(false);
   }
 }
 
@@ -1110,9 +1182,18 @@ try {
                  />
 
                 <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                 <div className="flex items-center justify-between mb-1">
+                   <label className="block text-sm font-medium text-gray-700">
                      Compte de trésorerie *
-                </label>
+                   </label>
+                   <button
+                     type="button"
+                     onClick={() => setShowAccountForm((visible) => !visible)}
+                     className="text-xs text-blue-600 hover:text-blue-700"
+                   >
+                     + Créer un compte
+                   </button>
+                 </div>
 
                  <select
                  value={formData.treasuryAccountId}
@@ -1134,6 +1215,81 @@ try {
                 </option>
                     ))}
                   </select>
+                  {showAccountForm && (
+                    <div className="mt-3 border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                          required
+                          value={accountForm.name}
+                          onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
+                          placeholder="Nom du compte *"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                        />
+                        <select
+                          value={accountForm.accountType}
+                          onChange={(e) => setAccountForm({ ...accountForm, accountType: e.target.value as TreasuryAccountType })}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                        >
+                          <option value="BANK">Banque</option>
+                          <option value="MOBILE_MONEY">Mobile Money</option>
+                          <option value="CASH">Caisse</option>
+                        </select>
+                        <input
+                          value={accountForm.accountNumber}
+                          onChange={(e) => setAccountForm({ ...accountForm, accountNumber: e.target.value })}
+                          placeholder="Numéro de compte"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white sm:col-span-2"
+                        />
+                      </div>
+                      <div className="border-t border-gray-200 pt-3">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Gestionnaire du compte</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <input
+                            required
+                            value={accountForm.managerName}
+                            onChange={(e) => setAccountForm({ ...accountForm, managerName: e.target.value })}
+                            placeholder="Nom du gestionnaire *"
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                          />
+                          <input
+                            required
+                            type="tel"
+                            value={accountForm.managerPhone}
+                            onChange={(e) => setAccountForm({ ...accountForm, managerPhone: e.target.value })}
+                            placeholder="Téléphone *"
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                          />
+                          <input
+                            required
+                            type="email"
+                            value={accountForm.managerEmail}
+                            onChange={(e) => setAccountForm({ ...accountForm, managerEmail: e.target.value })}
+                            placeholder="E-mail du gestionnaire *"
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white sm:col-span-2"
+                          />
+                        </div>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={accountForm.openingBalance}
+                        onChange={(e) => setAccountForm({ ...accountForm, openingBalance: Number(e.target.value) || 0 })}
+                        placeholder="Solde d'ouverture (FCFA)"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setShowAccountForm(false)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">Annuler</button>
+                        <button
+                          type="button"
+                          onClick={handleCreateTreasuryAccount}
+                          disabled={creatingAccount || !accountForm.name.trim() || !accountForm.managerName.trim() || !accountForm.managerPhone.trim() || !accountForm.managerEmail.trim()}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+                        >
+                          {creatingAccount ? "Création..." : "Créer le compte"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
               </div>
 
               </div>

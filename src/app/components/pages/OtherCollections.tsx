@@ -71,9 +71,12 @@ export function OtherCollections() {
   const { hasPermission, hasRole } = useAuth();
 
   // RBAC
-  const canManage  = hasPermission("other_collections:manage");
-  const canDelete  = hasRole(["admin"]) || canManage;
-  const isViewOnly = !canManage;
+ const canManage = hasPermission("other_collections:manage");
+const canValidateDG = hasPermission("other_collections:validate_dg");
+
+const canDelete = hasRole(["admin"]) || canManage;
+
+const isViewOnly = !canManage && !canValidateDG;
 
  const [collections, setCollections] = useState<any[]>([]);
  const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
@@ -529,35 +532,39 @@ const response = await createOtherReceipt({
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                         title="Voir détails"
                       >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {canManage && collection.status === "draft" && (
-                        <button
-                          onClick={() => handleApprove(collection.id)}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                          title="Approuver"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
-                      {canManage && collection.status === "approved" && (
-                        <button
-                          onClick={() => handleIntegrate(collection.id)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          title="Intégrer"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
-                      {canManage && (collection.status === "draft" || collection.status === "pending") && (
-                        <button
-                          onClick={() => handleReject(collection.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="Rejeter"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      )}
+                      <Eye className="w-4 h-4" />
+</button>
+
+{(canManage || canValidateDG) && collection.status === "draft" && (
+  <button
+    onClick={() => handleApprove(collection.id)}
+    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+    title="Approuver"
+  >
+    <CheckCircle className="w-4 h-4" />
+  </button>
+)}
+
+{canManage && collection.status === "approved" && (
+  <button
+    onClick={() => handleIntegrate(collection.id)}
+    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+    title="Intégrer"
+  >
+    <CheckCircle className="w-4 h-4" />
+  </button>
+)}
+
+{(canManage || canValidateDG) &&
+  (collection.status === "draft" || collection.status === "pending") && (
+    <button
+      onClick={() => handleReject(collection.id)}
+      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+      title="Rejeter"
+    >
+      <XCircle className="w-4 h-4" />
+    </button>
+  )}
                       {canDelete && (
                         <button
                           onClick={() => handleDelete(collection.id)}

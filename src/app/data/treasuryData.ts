@@ -92,6 +92,9 @@ export async function createTreasuryAccount(data: {
   currency: string;
   opening_balance: string | number;
   is_active: boolean;
+  manager_name?: string;
+  manager_phone?: string;
+  manager_email?: string;
 }) {
   const response = await apiRequest(
     "/v1/treasury/accounts/",

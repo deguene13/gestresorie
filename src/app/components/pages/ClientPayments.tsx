@@ -26,7 +26,14 @@ import {
 } from "../../data/customerPaymentsApi";
 import { getCustomerInvoices } from "../../data/customerInvoicesApi";
 
-type MoyenPaiement = "cheque" | "virement" | "traite" | "ordre_transfert";
+type MoyenPaiement =
+  | "cheque"
+  | "virement"
+  | "traite"
+  | "ordre_transfert"
+  | "especes"
+  | "mobile_money"
+  | "carte";
 type PaymentStatus =
   | "created"
   | "pending_validation"
@@ -48,7 +55,7 @@ type ClientPayment = {
   referenceNumber: string;
   status: PaymentStatus;
   date: string;
-  dueDate: string;
+  dueDate?: string;
   notes: string;
 };
 
@@ -109,6 +116,21 @@ const moyenConfig: Record<
     icon: FileText,
     refLabel: "Numéro de traite",
   },
+  especes: {
+  label: "Espèces",
+  icon: CreditCard,
+  refLabel: "",
+},
+mobile_money: {
+  label: "Mobile Money",
+  icon: CreditCard,
+  refLabel: "Référence de transaction",
+},
+carte: {
+  label: "Carte bancaire",
+  icon: CreditCard,
+  refLabel: "Référence de transaction",
+},
   ordre_transfert: {
     label: "Ordre de transfert",
     icon: ArrowLeftRight,
@@ -193,18 +215,20 @@ function MiniStepper({ status }: { status: PaymentStatus }) {
 
 const emptyForm = {
   invoiceRef: "",
+  invoiceId: "",
   client: "",
   invoiceAmount: "",
   paidAmount: "",
   moyenPaiement: "" as MoyenPaiement | "",
   referenceNumber: "",
-  dueDate: "",
+  paymentDate: "",
   notes: "",
 };
 
 export function ClientPayments() {
   const { lang, t } = useLanguage();
   const [payments, setPayments] = useState<ClientPayment[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -219,7 +243,9 @@ export function ClientPayments() {
 
      const response = await getCustomerPayments();
 
-const invoicesResponse = await getCustomerInvoices();
+const invoicesResponse = await getCustomerInvoices({
+  payable: true,
+});
 
 console.log(
   "Paiements clients Django :",
@@ -233,6 +259,7 @@ console.log(
 
 const djangoPayments = response?.results ?? [];
 const djangoInvoices = invoicesResponse?.results ?? [];
+setInvoices(djangoInvoices);
 const invoicesById = Object.fromEntries(
   djangoInvoices.map((invoice: any) => [invoice.id, invoice])
 );
@@ -254,14 +281,20 @@ const mappedPayments: ClientPayment[] = djangoPayments.map(
    remainingAmount:
   Number(invoicesById[payment.invoice]?.total_amount_ttc ?? 0) -
   Number(payment.amount ?? 0),
-    moyenPaiement:
-      payment.payment_method === "BANK_TRANSFER"
-        ? "virement"
-        : payment.payment_method === "CHECK"
-        ? "cheque"
-        : payment.payment_method === "BILL_OF_EXCHANGE"
-        ? "traite"
-        : "ordre_transfert",
+   moyenPaiement:
+  payment.payment_method === "BANK_TRANSFER"
+    ? "virement"
+    : payment.payment_method === "CHECK"
+    ? "cheque"
+    : payment.payment_method === "CASH"
+    ? "especes"
+    : payment.payment_method === "MOBILE_MONEY"
+    ? "mobile_money"
+    : payment.payment_method === "CARD"
+    ? "carte"
+    : payment.payment_method === "TRAIT"
+    ? "traite"
+    : "ordre_transfert",
     referenceNumber: "",
     status:
       payment.status === "SUBMITTED"
@@ -322,9 +355,9 @@ setPayments(mappedPayments);
 
  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const invoiceId = payments.find(
-  (p) => p.invoiceRef === formData.invoiceRef
-)?.invoiceId;
+    const invoiceId = invoices.find(
+  (invoice) => invoice.reference === formData.invoiceRef
+)?.id;
 if (!invoiceId) {
   console.error("UUID facture introuvable :", formData.invoiceRef);
   return;
@@ -335,14 +368,20 @@ const paymentData = {
   invoice: invoiceId,
   amount: formData.paidAmount,
   payment_method:
-    formData.moyenPaiement === "virement"
-      ? "BANK_TRANSFER"
-      : formData.moyenPaiement === "cheque"
-      ? "CHECK"
-      : formData.moyenPaiement === "traite"
-      ? "BILL_OF_EXCHANGE"
-      : "TRANSFER_ORDER",
- payment_date: new Date().toISOString().split("T")[0],
+  formData.moyenPaiement === "virement"
+    ? "BANK_TRANSFER"
+    : formData.moyenPaiement === "cheque"
+    ? "CHECK"
+    : formData.moyenPaiement === "especes"
+    ? "CASH"
+    : formData.moyenPaiement === "mobile_money"
+    ? "MOBILE_MONEY"
+    : formData.moyenPaiement === "carte"
+    ? "CARD"
+    : formData.moyenPaiement === "traite"
+    ? "TRAIT"
+    : "BANK_TRANSFER",
+ payment_date: formData.paymentDate,
   notes: formData.notes,
 };
 
@@ -380,7 +419,6 @@ console.log(
     ? "rejected"
     : "created",
       date: new Date().toISOString().split("T")[0],
-      dueDate: formData.dueDate,
       notes: formData.notes,
     };
     setPayments((prev) => [newPayment, ...prev]);
@@ -701,16 +739,34 @@ console.log(
                 <label className="block text-sm text-gray-700 mb-1">
                   Référence facture *
                 </label>
-                <input
-                  type="text"
-                  value={formData.invoiceRef}
-                  onChange={(e) =>
-                    setFormData((f) => ({ ...f, invoiceRef: e.target.value }))
-                  }
-                  required
-                  placeholder="FAC-C-2024-XXX"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                />
+               <select
+  value={formData.invoiceRef}
+ onChange={(e) => {
+  const selectedInvoice = invoices.find(
+    (invoice) => invoice.reference === e.target.value
+  );
+
+  setFormData((f) => ({
+    ...f,
+    invoiceRef: selectedInvoice?.reference ?? "",
+    invoiceId: selectedInvoice?.id ?? "",
+    client: selectedInvoice?.customer_detail?.raison_sociale ?? "",
+    invoiceAmount: selectedInvoice?.total_amount_ttc ?? "",
+    
+  }));
+}}
+  required
+  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+>
+  <option value="">Sélectionner une facture</option>
+
+  {invoices.map((invoice) => (
+    <option key={invoice.id} value={invoice.reference}>
+      {invoice.reference} — {invoice.customer_detail?.raison_sociale} —{" "}
+      {invoice.balance_due} {invoice.currency}
+    </option>
+  ))}
+</select>
               </div>
               <div>
                 <label className="block text-sm text-gray-700 mb-1">
@@ -779,26 +835,29 @@ console.log(
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
                 >
                   <option value="">Sélectionner un moyen</option>
-                  <option value="cheque">Chèque</option>
-                  <option value="virement">Virement bancaire</option>
+                   <option value="virement">Virement bancaire</option>
+                   <option value="cheque">Chèque</option>
+                   <option value="especes">Espèces</option>
+                   <option value="mobile_money">Mobile Money</option>
+                  <option value="carte">Carte bancaire</option>
                   <option value="traite">Traite</option>
-                  <option value="ordre_transfert">Ordre de transfert</option>
                 </select>
               </div>
-              {formData.moyenPaiement && (
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    {moyenConfig[formData.moyenPaiement as MoyenPaiement].refLabel} *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.referenceNumber}
-                    onChange={(e) =>
-                      setFormData((f) => ({
-                        ...f,
-                        referenceNumber: e.target.value,
-                      }))
-                    }
+             {formData.moyenPaiement &&
+  formData.moyenPaiement !== "especes" && (
+    <div>
+      <label className="block text-sm text-gray-700 mb-1">
+        {moyenConfig[formData.moyenPaiement as MoyenPaiement].refLabel} *
+      </label>
+      <input
+        type="text"
+        value={formData.referenceNumber}
+        onChange={(e) =>
+          setFormData((f) => ({
+            ...f,
+            referenceNumber: e.target.value,
+          }))
+        }
                     required
                     placeholder={`Saisir le ${moyenConfig[
                       formData.moyenPaiement as MoyenPaiement
@@ -807,19 +866,19 @@ console.log(
                   />
                 </div>
               )}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  Date d'échéance
-                </label>
-                <input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) =>
-                    setFormData((f) => ({ ...f, dueDate: e.target.value }))
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                />
-              </div>
+             <div>
+  <label className="block text-sm text-gray-700 mb-1">
+    Date du paiement
+  </label>
+  <input
+    type="date"
+    value={formData.paymentDate}
+    onChange={(e) =>
+      setFormData((f) => ({ ...f, paymentDate: e.target.value }))
+    }
+    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+  />
+</div>
               <div>
                 <label className="block text-sm text-gray-700 mb-1">
                   Notes

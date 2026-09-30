@@ -398,15 +398,15 @@ const handleSubmit = async () => {
         />
       </div>
 
-      <div className="border rounded-xl overflow-hidden">
+      <div className="border rounded-xl overflow-auto max-h-[600px]">
 
-        <table className="w-full">
+  <table className="w-full min-w-[1200px]">
 
-          <thead className="bg-gray-50">
-  <tr>
-    <th className="p-3 text-left">
-      Nom / raison sociale
-    </th>
+    <thead className="bg-gray-50 sticky top-0 z-10">
+      <tr>
+        <th className="p-3 text-left">
+          Nom / raison sociale
+        </th>
 
     <th className="p-3 text-left">
       NINEA
@@ -436,9 +436,11 @@ const handleSubmit = async () => {
       Statut
     </th>
 
-    <th className="p-3">
-      Actions
-    </th>
+    {canManage && (
+  <th className="p-3">
+    Actions
+  </th>
+)}
   </tr>
 </thead>
 
