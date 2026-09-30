@@ -65,7 +65,7 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
             <div className="text-sm text-gray-700 space-y-1">
               <p>123 Avenue de la République</p>
               <p>Dakar, Sénégal</p>
-              <p>Tél: +221 33 123 45 67</p>
+              <p>Tél: +221 33 000 00 00</p>
               <p>Email: contact@entreprise.sn</p>
             </div>
           </div>

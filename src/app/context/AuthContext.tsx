@@ -128,9 +128,6 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
 
   comptable: [
     "dashboard:view",
-    "products:view",
-    "clients:view",
-    "client_orders:view",
     "supplier_invoices:view",
     "supplier_invoices:manage",
     "supplier_invoices:create",
@@ -190,7 +187,6 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "client_invoices:validate",
     "client_invoices:reject",
     "client_payments:view",
-    "other_collections:view",
     "clients:view",
     "clients:create",
     "clients:edit",

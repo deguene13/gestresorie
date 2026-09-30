@@ -1094,7 +1094,7 @@ const selectedRaw = selectedId
                   {cat.icon}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-2xl font-bold ${cat.color}`}>{cat.count}</span>
+                  <span className={`text-2xl font-bold ${cat.color}`}></span>
                   <span className="text-xs text-gray-400">doc.</span>
                 </div>
               </div>
