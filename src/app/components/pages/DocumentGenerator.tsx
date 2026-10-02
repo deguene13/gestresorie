@@ -227,7 +227,14 @@ const fmt = (n: number) => n.toLocaleString("fr-FR") + " FCFA";
 
 // ─── Map raw data → DocumentData ──────────────────────────────────────────────
 
-function toDocData(category: string, item: any): DocumentData {
+function toDocData(
+  category: string,
+  item: any,
+  company: any,
+  suppliers: any[],
+  customers: any[]
+): DocumentData {
+
   const purchaseOrders = getPurchaseOrders();
 
   switch (category) {
@@ -243,6 +250,11 @@ function toDocData(category: string, item: any): DocumentData {
     date: item.quote_date
       ? new Date(item.quote_date).toLocaleDateString("fr-FR")
       : "—",
+
+   companyName: company?.name || "—",
+companyAddress: company?.address || "—",
+companyPhone: company?.phone || "—",
+companyEmail: company?.email || "—",
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -278,6 +290,11 @@ function toDocData(category: string, item: any): DocumentData {
     date: item.order_date
       ? new Date(item.order_date).toLocaleDateString("fr-FR")
       : "—",
+
+   companyName: company?.name || "—",
+companyAddress: company?.address || "—",
+companyPhone: company?.phone || "—",
+companyEmail: company?.email || "—",
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -315,6 +332,11 @@ function toDocData(category: string, item: any): DocumentData {
       ? new Date(item.order_date).toLocaleDateString("fr-FR")
       : "—",
 
+   companyName: company?.name || "—",
+companyAddress: company?.address || "—",
+companyPhone: company?.phone || "—",
+companyEmail: company?.email || "—",
+
     clientName: item.supplier_detail?.raison_sociale || "—",
 
     clientAddress: "—",
@@ -348,7 +370,11 @@ function toDocData(category: string, item: any): DocumentData {
       : item.notes || undefined,
   };
 
-    case "client-invoices":
+    case "client-invoices": {
+  const fullCustomer = customers.find(
+    (customer) => customer.id === item.customer_detail?.id
+  );
+
   return {
     type: "Facture",
 
@@ -357,6 +383,18 @@ function toDocData(category: string, item: any): DocumentData {
     date: item.invoice_date
       ? new Date(item.invoice_date).toLocaleDateString("fr-FR")
       : "—",
+
+   companyName:
+  fullCustomer?.raison_sociale || "—",
+
+companyAddress:
+  fullCustomer?.address || "—",
+
+companyPhone:
+  fullCustomer?.phone || "—",
+
+companyEmail:
+  fullCustomer?.email || "—",
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -392,7 +430,16 @@ function toDocData(category: string, item: any): DocumentData {
         ? `Réf. BDC : ${item.order_reference}`
         : undefined,
   };
-    case "supplier-invoices":
+  }
+  case "supplier-invoices": {
+       console.log(
+    "=== FOURNISSEUR FACTURE ===",
+    JSON.stringify(item.supplier_detail, null, 2)
+  );
+  const fullSupplier = suppliers.find(
+  (supplier) => supplier.id === item.supplier_detail?.id
+);
+
   return {
     type: "Facture",
 
@@ -405,8 +452,18 @@ function toDocData(category: string, item: any): DocumentData {
       ? new Date(item.invoice_date).toLocaleDateString("fr-FR")
       : "—",
 
-    clientName:
-      item.supplier_detail?.raison_sociale || "—",
+   companyName:
+  fullSupplier?.raison_sociale || "—",
+
+companyAddress:
+  fullSupplier?.address || "—",
+
+companyPhone:
+  fullSupplier?.phone || "—",
+
+companyEmail:
+  fullSupplier?.email || "—",
+  clientName: "—",
 
     clientAddress: "—",
 
@@ -454,8 +511,13 @@ function toDocData(category: string, item: any): DocumentData {
       .filter(Boolean)
       .join(" — ") || undefined,
   };
+  }
 
-    case "supplier-deliveries":
+    case "supplier-deliveries": {
+  const fullSupplier = suppliers.find(
+    (supplier) => supplier.id === item.supplier_detail?.id
+  );
+
   return {
     type: "Bordereau de livraison",
 
@@ -464,6 +526,18 @@ function toDocData(category: string, item: any): DocumentData {
     date: item.delivery_date
       ? new Date(item.delivery_date).toLocaleDateString("fr-FR")
       : "—",
+
+    companyName:
+  fullSupplier?.raison_sociale || "—",
+
+companyAddress:
+  fullSupplier?.address || "—",
+
+companyPhone:
+  fullSupplier?.phone || "—",
+
+companyEmail:
+  fullSupplier?.email || "—",
 
     clientName:
       item.supplier_detail?.raison_sociale || "—",
@@ -523,8 +597,13 @@ total: (item.items || []).reduce((sum: number, i: any) => {
       .filter(Boolean)
       .join(" — ") || undefined,
   };
+  }
 
-    case "client-deliveries":
+    case "client-deliveries": {
+  const fullCustomer = customers.find(
+    (customer) => customer.id === item.customer_detail?.id
+  );
+
   return {
     type: "Bordereau de livraison",
 
@@ -533,6 +612,18 @@ total: (item.items || []).reduce((sum: number, i: any) => {
     date: item.delivery_date
       ? new Date(item.delivery_date).toLocaleDateString("fr-FR")
       : "—",
+
+    companyName:
+  fullCustomer?.raison_sociale || "—",
+
+companyAddress:
+  fullCustomer?.address || "—",
+
+companyPhone:
+  fullCustomer?.phone || "—",
+
+companyEmail:
+  fullCustomer?.email || "—",
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -567,12 +658,28 @@ total: (item.items || []).reduce((sum: number, i: any) => {
         ? `Réf. BDC : ${item.order_reference}`
         : undefined),
   };
+  }
     default:
-      return {
-        type: "Facture", number: "—", date: "—", clientName: "—",
-        clientAddress: "—", clientPhone: "—", items: [],
-        subtotal: 0, tvaRate: 0, tvaAmount: 0, total: 0,
-      };
+  return {
+    type: "Facture",
+    number: "—",
+    date: "—",
+
+    companyName: company?.name || "—",
+companyAddress: company?.address || "—",
+companyPhone: company?.phone || "—",
+companyEmail: company?.email || "—",
+
+    clientName: "—",
+    clientAddress: "—",
+    clientPhone: "—",
+
+    items: [],
+    subtotal: 0,
+    tvaRate: 0,
+    tvaAmount: 0,
+    total: 0,
+  };
   }
 }
 
@@ -741,6 +848,64 @@ function getRawItem(
 
 export function DocumentGenerator() {
   const { lang, t } = useLanguage();
+  const [company, setCompany] = useState<any>(null);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  useEffect(() => {
+  const loadCurrentUser = async () => {
+    try {
+      const response = await apiRequest("/v1/users/me/");
+
+      console.log(
+        "=== ENTREPRISE POUR DOCUMENT ===",
+        JSON.stringify(response?.company, null, 2)
+      );
+
+      setCompany(response?.company || null);
+    } catch (error) {
+      console.error("Erreur récupération entreprise :", error);
+    }
+  };
+
+  loadCurrentUser();
+}, []);
+
+useEffect(() => {
+  const loadSuppliers = async () => {
+    try {
+      const response = await apiRequest("/v1/suppliers/");
+
+      console.log(
+        "=== FOURNISSEURS POUR DOCUMENT ===",
+        JSON.stringify(response?.results, null, 2)
+      );
+
+      setSuppliers(response?.results || []);
+    } catch (error) {
+      console.error("Erreur récupération fournisseurs :", error);
+    }
+  };
+
+  loadSuppliers();
+}, []);
+useEffect(() => {
+  const loadCustomers = async () => {
+    try {
+      const response = await apiRequest("/v1/customers/");
+
+      console.log(
+        "=== CLIENTS POUR DOCUMENT ===",
+        JSON.stringify(response?.results, null, 2)
+      );
+
+      setCustomers(response?.results || []);
+    } catch (error) {
+      console.error("Erreur récupération clients :", error);
+    }
+  };
+
+  loadCustomers();
+}, []);
 
   // mode: "catalog" | "list" | "preview"
   type Mode = "catalog" | "list" | "preview";
@@ -1044,9 +1209,15 @@ const selectedRaw = selectedId
       djangoSupplierDeliveries
     )
   : null;
-  const selectedDocData: DocumentData | null = selectedRaw
-    ? toDocData(activeCategory, selectedRaw)
-    : null;
+ const selectedDocData: DocumentData | null = selectedRaw
+ ? toDocData(
+    activeCategory,
+    selectedRaw,
+    company,
+    suppliers,
+    customers
+  )
+  : null;
 
   // ── PDF print handler ────────────────────────────────────────────────────────
   const handleDownloadPDF = () => {

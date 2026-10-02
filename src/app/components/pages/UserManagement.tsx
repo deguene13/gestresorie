@@ -10,7 +10,7 @@ const roles = [
   { label: "DAF", value: "DAF" },
   { label: "Comptable", value: "ACCOUNTANT" },
   { label: "Gestionnaire achats", value: "PURCHASING_MANAGER" },
-  { label: "Service Commercial", value: "SALE_MANAGER" },
+  { label: "Service Commercial", value: "SALES_MANAGER" },
   { label: "Fournisseur", value: "SUPPLIER" },
 ];
 

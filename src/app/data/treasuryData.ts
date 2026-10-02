@@ -55,10 +55,14 @@ type:
     // Solde d'ouverture
     openingBalance: Number(account.opening_balance || 0),
 
-     // Informations du gestionnaire
-    gestionnaire: account.manager_name || "",
-    contact: account.manager_phone || "",
-    email: account.manager_email || "",
+    // Informations du gestionnaire
+gestionnaire: account.manager_name || "",
+contact: account.manager_phone || "",
+email: account.manager_email || "",
+
+managerName: account.manager_name || "",
+managerPhone: account.manager_phone || "",
+managerEmail: account.manager_email || "",
 
     encaissements: 0,
     decaissements: 0,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, Plus, Eye, Package, CheckCircle, AlertTriangle, Trash2, X, FileText, XCircle } from "lucide-react";
+import { Search, Plus, Eye, Package, CheckCircle,Pencil, AlertTriangle, Trash2, X, FileText, XCircle } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAppData } from "../../context/AppDataContext";
 import { useAuth } from "../../context/AuthContext";
@@ -7,6 +7,8 @@ import { apiRequest } from "../../apiClient";
 import { RejectModal } from "../shared/RejectModal";
 
 type DeliveryItem = {
+  id: string;
+  productId: string;
   productName: string;
   orderedQty: number;
   deliveredQty: number;
@@ -104,28 +106,31 @@ export function SupplierDeliveries() {
     deliveryDate: delivery.delivery_date || "",
 
     status:
-  delivery.status === "COMPLETED" ||
-  delivery.status === "VALIDATED"
-    ? "complete"
-    : delivery.status === "PARTIAL"
-    ? "partial"
-    : delivery.status === "REJECTED"
+  delivery.status === "REJECTED"
     ? "rejected"
-    : "pending",
+    : (delivery.items ?? []).length > 0 &&
+      (delivery.items ?? []).every(
+        (item: any) =>
+          Number(item.quantity_received || 0) >=
+          Number(item.quantity_ordered || 0)
+      )
+    ? "complete"
+    : "partial",
 
-    items: (delivery.items ?? []).map((item: any) => ({
-      productName: item.product_detail?.name || "",
-      orderedQty: Number(item.quantity_ordered || 0),
-      deliveredQty: Number(item.quantity_received || 0),
-      remainingQty: Math.max(
-        0,
-        Number(item.quantity_ordered || 0) -
-          Number(item.quantity_received || 0)
-      ),
-      unit: item.product_detail?.unit || "",
-      unitPrice: Number(item.product_detail?.unit_price || 0),
-    })),
-
+   items: (delivery.items ?? []).map((item: any) => ({
+  id: item.id || "",
+  productId: item.product || item.product_detail?.id || "",
+  productName: item.product_detail?.name || "",
+  orderedQty: Number(item.quantity_ordered || 0),
+  deliveredQty: Number(item.quantity_received || 0),
+  remainingQty: Math.max(
+    0,
+    Number(item.quantity_ordered || 0) -
+      Number(item.quantity_received || 0)
+  ),
+  unit: item.product_detail?.unit || "",
+  unitPrice: Number(item.product_detail?.unit_price || 0),
+})),
     notes: delivery.notes || "",
     rejectionReason: delivery.last_rejection_comment || "",
     document: delivery.supplier_delivery_note || "",
@@ -185,6 +190,8 @@ useEffect(() => {
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState<SupplierDelivery | null>(null);
+  const [editingDelivery, setEditingDelivery] =
+  useState<SupplierDelivery | null>(null);
   const [bdcUpdateNote, setBdcUpdateNote] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -401,7 +408,9 @@ const handleBdcChange = (bdcRef: string) => {
      JSON.stringify(formItems, null, 2)
   );
     console.log("=== BDC SÉLECTIONNÉ ===", formData.bdcRef);
-    const mappedItems: DeliveryItem[] = formItems.map((i) => ({
+   const mappedItems: DeliveryItem[] = formItems.map((i) => ({
+  id: "",
+  productId: i.productId,
   productName: i.productName,
   orderedQty: Number(i.orderedQty),
   deliveredQty: Number(i.deliveredQty),
@@ -531,8 +540,44 @@ console.log(
 }));
     setFormItems([emptyItem()]);
   };
+  const handleEdit = (delivery: SupplierDelivery) => {
+  setEditingDelivery(delivery);
+
+  setFormData((prev) => ({
+  ...prev,
+  bdcRef: delivery.bdcRef,
+  supplier: delivery.supplier,
+  deliveryDate: delivery.deliveryDate,
+  notes: delivery.notes || "",
+  document: delivery.document || "",
+}));
+  setFormItems(
+    delivery.items.map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      orderedQty: Number(item.orderedQty),
+      deliveredQty: Number(item.deliveredQty),
+      remainingQty: Number(item.remainingQty),
+      unit: item.unit,
+      unitPrice: Number(item.unitPrice),
+    }))
+  );
+
+  setShowModal(true);
+};
 
  const handleValidate = async (delivery: SupplierDelivery) => {
+  const hasIncompleteItem = delivery.items.some(
+  (item) =>
+    Number(item.deliveredQty) < Number(item.orderedQty)
+);
+
+if (hasIncompleteItem) {
+  alert(
+    "Cette livraison est encore partielle. Modifiez les quantités reçues pour atteindre les quantités commandées avant de la marquer comme complète."
+  );
+  return;
+}
   if (delivery.status === "rejected") {
     alert(
       "Cette livraison a été rejetée et ne peut pas être validée directement."
@@ -693,10 +738,196 @@ console.log(
     );
 
     alert(
-      "Le BL a été validé, mais la facture fournisseur n'a pas pu être créée."
+      "Le BL est incomplet, veuillez le modifier avant de valider pour créer une facture fournisseur."
     );
   }
 };
+const handleUpdate = async (
+  deliveryId: string,
+  deliveryDate: string,
+  notes: string,
+  document: string,
+  items: DeliveryItem[]
+) => {
+  try {
+    console.log("=== MODIFICATION LIVRAISON DJANGO ===");
+    console.log("ID :", deliveryId);
+
+    const payload = {
+      delivery_date: deliveryDate,
+      supplier_delivery_note: document || "",
+      notes: notes || "",
+      items: items.map((item) => ({
+        id: item.id,
+        product: item.productId,
+        quantity_received: Number(item.deliveredQty),
+        discrepancy_reason: "",
+      })),
+    };
+
+    console.log(
+      "=== PAYLOAD MODIFICATION LIVRAISON ===",
+      JSON.stringify(payload, null, 2)
+    );
+
+    const response = await apiRequest(
+      `/v1/deliveries/${deliveryId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }
+    );
+
+    console.log(
+      "=== RÉPONSE MODIFICATION LIVRAISON DJANGO ===",
+      JSON.stringify(response, null, 2)
+    );
+
+    setDeliveriesFromDjango((prev) =>
+      prev.map((delivery) =>
+        delivery.id === deliveryId
+          ? response
+          : delivery
+      )
+    );
+
+    setDeliveries((prev) =>
+  prev.map((delivery) =>
+    delivery.id === deliveryId
+      ? {
+          ...delivery,
+          deliveryDate:
+            response.delivery_date || deliveryDate,
+          notes: response.notes || notes,
+          document:
+            response.supplier_delivery_note || document,
+          items: (response.items ?? []).map((item: any) => {
+            const existingItem = delivery.items.find(
+              (oldItem) => oldItem.id === item.id
+            );
+
+            const orderedQty = existingItem?.orderedQty ?? 0;
+            const deliveredQty = Number(item.quantity_received ?? 0);
+
+            return {
+              id: item.id,
+              productId:
+                existingItem?.productId ||
+                item.product ||
+                "",
+              productName:
+                existingItem?.productName ||
+                "",
+              orderedQty,
+              deliveredQty,
+              remainingQty: Math.max(
+                0,
+                orderedQty - deliveredQty
+              ),
+              unit:
+                existingItem?.unit ||
+                "",
+              unitPrice:
+                existingItem?.unitPrice ||
+                0,
+            };
+          }),
+        }
+      : delivery
+  )
+);
+
+    const refreshResponse = await apiRequest("/v1/deliveries/");
+   const refreshedDelivery = refreshResponse.results?.find(
+  (delivery: any) => delivery.id === deliveryId
+);
+
+console.log(
+  "=== BL APRÈS MODIFICATION — DONNÉE DJANGO ===",
+  refreshedDelivery
+);
+
+console.log(
+  "=== ITEMS DU BL APRÈS MODIFICATION ===",
+  refreshedDelivery?.items
+);
+console.log(
+  "=== QUANTITÉ APRÈS MODIFICATION ===",
+  refreshedDelivery?.items?.[0]?.quantity_received
+);
+
+const refreshedDeliveries: SupplierDelivery[] =
+  (refreshResponse.results ?? []).map((delivery: any) => ({
+    id: delivery.id,
+    reference: delivery.reference || "",
+    bdcRef: delivery.purchase_order_reference || "",
+    supplier: delivery.supplier_detail?.raison_sociale || "",
+    deliveryDate: delivery.delivery_date || "",
+
+    status:
+      delivery.status === "COMPLETED" ||
+      delivery.status === "VALIDATED"
+        ? "complete"
+        : delivery.status === "PARTIAL"
+        ? "partial"
+        : delivery.status === "REJECTED"
+        ? "rejected"
+        : "pending",
+
+    items: (delivery.items ?? []).map((item: any) => ({
+      id: item.id || "",
+      productId:
+        item.product || item.product_detail?.id || "",
+      productName:
+        item.product_detail?.name || "",
+      orderedQty:
+        Number(item.quantity_ordered || 0),
+      deliveredQty:
+        Number(item.quantity_received || 0),
+      remainingQty: Math.max(
+        0,
+        Number(item.quantity_ordered || 0) -
+          Number(item.quantity_received || 0)
+      ),
+      unit:
+        item.product_detail?.unit || "",
+      unitPrice:
+        Number(item.product_detail?.unit_price || 0),
+    })),
+
+    notes: delivery.notes || "",
+    rejectionReason:
+      delivery.last_rejection_comment || "",
+    document:
+      delivery.supplier_delivery_note || "",
+  }));
+
+
+setDeliveries(refreshedDeliveries);
+const refreshedSelected = refreshedDeliveries.find(
+  (delivery) => delivery.id === deliveryId
+);
+
+if (refreshedSelected) {
+  setSelectedDelivery(refreshedSelected);
+}
+setDeliveriesFromDjango(refreshResponse.results ?? []);
+setBdcUpdateNote(
+  `Le BL ${deliveryId} a été modifié avec succès.`
+);
+
+setTimeout(() => setBdcUpdateNote(null), 5000);
+  } catch (error) {
+    console.error(
+      "=== ERREUR MODIFICATION LIVRAISON DJANGO ===",
+      error
+    );
+
+    alert("Impossible de modifier cette livraison.");
+  }
+};
+
+
 
  const handleDelete = async (id: string) => {
   console.log("=== ID SUPPRESSION DJANGO ===", id);
@@ -927,16 +1158,30 @@ console.log(
                          onClick={() => {
                           console.log("=== LIVRAISON SÉLECTIONNÉE ===", delivery);
                            console.log("=== MOTIF REJET ===", delivery.rejectionReason);
+                           console.log(
+                           "=== STATUT LIVRAISON SÉLECTIONNÉE ===",
+                           selectedDelivery?.status
+                        );
 
-                           setSelectedDelivery(delivery);
-                           setShowDetailModal(true);
+                          setSelectedDelivery(deliveries.find((d) => d.id === delivery.id) || delivery);
+                          setShowDetailModal(true);
                         }}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                           title="Voir détails"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {canValidate && delivery.status !== "complete" && (
+                        {canCreate && delivery.status !== "complete" && (
+                       <button
+                          onClick={() => handleEdit(delivery)}
+                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition"
+                         title="Modifier"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+
+                       {canValidate && delivery.status === "partial" && (
                           <button
                            onClick={() => handleValidate(delivery)}
                             className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
@@ -995,12 +1240,38 @@ console.log(
         <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl text-gray-900">Nouveau bon de livraison fournisseur</h2>
+             <h2 className="text-xl font-bold text-gray-900">
+              {editingDelivery
+               ? "Modifier le bon de livraison fournisseur"
+              : "Nouveau bon de livraison fournisseur"}
+             </h2>
               <button onClick={() => { setShowModal(false); resetForm(); }}>
                 <X className="w-6 h-6 text-gray-400 hover:text-gray-600" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form
+  onSubmit={(e) => {
+    if (editingDelivery) {
+      e.preventDefault();
+
+      handleUpdate(
+        editingDelivery.id,
+        formData.deliveryDate,
+        formData.notes,
+        formData.document,
+        formItems.map((item, index) => ({
+  ...item,
+  id: editingDelivery.items[index]?.id || "",
+}))
+      );
+
+      return;
+    }
+
+    handleSubmit(e);
+  }}
+  
+>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-700 mb-2">Référence BDC *</label>
@@ -1192,7 +1463,7 @@ console.log(
                   type="submit"
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition"
                 >
-                  Créer le BL
+                 {editingDelivery ? "Enregistrer les modifications" : "Créer le BL"}
                 </button>
               </div>
             </form>

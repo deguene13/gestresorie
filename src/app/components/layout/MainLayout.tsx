@@ -230,12 +230,7 @@ export function MainLayout() {
     path: "/app/audit",
     perm: "audit:view",
   },
-  {
-    icon: CheckCircle,
-    label: "Approbations",
-    path: "/app/approvals",
-    perm: "approvals:view",
-  },
+ 
   
 ].filter(item => can(item.perm));
 

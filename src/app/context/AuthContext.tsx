@@ -124,6 +124,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   "reports:view",
   "reports:export",
   "fournisseurs_espace:view",
+  "settings:view",
 ],
 
   comptable: [

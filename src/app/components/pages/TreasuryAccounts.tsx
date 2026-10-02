@@ -61,15 +61,18 @@ export function TreasuryAccounts() {
 
     try {
       setSaving(true);
-      await createTreasuryAccount({
-        name: form.name.trim(),
-        account_type: form.accountType,
-        account_number: form.accountNumber.trim(),
-        bank_name: form.bankName.trim(),
-        currency: form.currency,
-        opening_balance: form.openingBalance || "0",
-        is_active: true,
-      });
+     await createTreasuryAccount({
+  name: form.name.trim(),
+  account_type: form.accountType,
+  account_number: form.accountNumber.trim(),
+  bank_name: form.bankName.trim(),
+  currency: form.currency,
+  opening_balance: form.openingBalance || "0",
+  manager_name: form.managerName.trim(),
+  manager_phone: form.managerPhone.trim(),
+  manager_email: form.managerEmail.trim(),
+  is_active: true,
+});
       setForm(emptyForm);
       setShowForm(false);
       await loadAccounts();
@@ -100,35 +103,233 @@ export function TreasuryAccounts() {
           </button>
         </div>
       </div>
+      
 
       {error && <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">{error}</div>}
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input required placeholder="Nom du compte *" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" />
-            <select value={form.accountType} onChange={(event) => setForm({ ...form, accountType: event.target.value as AccountType })} className="px-3 py-2 border border-gray-300 rounded-lg">
-              <option value="BANK">Banque</option>
-              <option value="MOBILE_MONEY">Mobile Money</option>
-              <option value="CASH">Caisse</option>
-            </select>
-            <input placeholder="Numéro de compte" value={form.accountNumber} onChange={(event) => setForm({ ...form, accountNumber: event.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" />
-            <input placeholder="Banque" value={form.bankName} onChange={(event) => setForm({ ...form, bankName: event.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" />
-            <input type="number" min="0" placeholder="Solde d'ouverture" value={form.openingBalance} onChange={(event) => setForm({ ...form, openingBalance: event.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" />
-            <input placeholder="Devise" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Annuler</button>
-            <button disabled={saving} type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50">{saving ? "Création..." : "Créer"}</button>
-          </div>
-        </form>
-      )}
+     {showForm && (
+        
+  <form
+    onSubmit={handleSubmit}
+    className="bg-white border border-gray-200 rounded-xl p-5 space-y-6"
+  >
+    <div>
+    </div>
 
+    {/* Informations du compte */}
+    <div className="space-y-4">
+      <h3 className="font-medium text-gray-900">
+        Informations du compte
+      </h3>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nom du compte *
+          </label>
+          <input
+            required
+            placeholder="Ex. Compte bancaire principal"
+            value={form.name}
+            onChange={(event) =>
+              setForm({ ...form, name: event.target.value })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Type *
+          </label>
+          <select
+            required
+            value={form.accountType}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                accountType: event.target.value as AccountType,
+              })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          >
+            <option value="BANK">Banque</option>
+            <option value="MOBILE_MONEY">Mobile Money</option>
+            <option value="CASH">Caisse</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Numéro de compte
+          </label>
+          <input
+            placeholder="Numéro de compte"
+            value={form.accountNumber}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                accountNumber: event.target.value,
+              })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Gestionnaire du compte */}
+    <div className="space-y-4">
+      <h3 className="font-medium text-gray-900">
+        Gestionnaire du compte
+      </h3>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nom du gestionnaire *
+          </label>
+          <input
+            required
+            placeholder="Nom du gestionnaire"
+            value={form.managerName}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                managerName: event.target.value,
+              })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Téléphone *
+          </label>
+          <input
+            required
+            type="tel"
+            placeholder="Téléphone"
+            value={form.managerPhone}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                managerPhone: event.target.value,
+              })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            E-mail du gestionnaire *
+          </label>
+          <input
+            required
+            type="email"
+            placeholder="E-mail du gestionnaire"
+            value={form.managerEmail}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                managerEmail: event.target.value,
+              })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Solde */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Solde d'ouverture (FCFA)
+      </label>
+      <input
+        type="number"
+        min="0"
+        placeholder="0"
+        value={form.openingBalance}
+        onChange={(event) =>
+          setForm({
+            ...form,
+            openingBalance: event.target.value,
+          })
+        }
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+      />
+    </div>
+
+    {/* Actions */}
+    <div className="flex justify-end gap-2 pt-2">
+      <button
+        type="button"
+        onClick={() => setShowForm(false)}
+        className="px-4 py-2 border border-gray-300 rounded-lg"
+      >
+        Annuler
+      </button>
+
+      <button
+        disabled={saving}
+        type="submit"
+        className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
+      >
+        {saving ? "Création..." : "Ajouter le compte"}
+      </button>
+    </div>
+  </form>
+)}
+ <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Consultez la liste des comptes trésoreries</h1>
+          <p className="text-gray-600 mt-1"> </p>
+        </div>
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         {loading ? <p className="p-6 text-gray-500">Chargement...</p> : accounts.length === 0 ? (
           <div className="p-10 text-center text-gray-500"><Wallet className="w-8 h-8 mx-auto mb-2 text-gray-300" />Aucun compte configuré.</div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="px-5 py-3 text-left">Compte</th><th className="px-5 py-3 text-left">Type</th><th className="px-5 py-3 text-left">Numéro</th><th className="px-5 py-3 text-right">Solde</th><th className="px-5 py-3 text-left">Devise</th></tr></thead><tbody className="divide-y divide-gray-100">{accounts.map((account) => <tr key={account.id}><td className="px-5 py-4 font-medium text-gray-900">{account.name}</td><td className="px-5 py-4 text-gray-600">{account.type === "bank" ? "Banque" : account.type === "mobile_money" ? "Mobile Money" : "Caisse"}</td><td className="px-5 py-4 text-gray-600">{account.accountNumber || "—"}</td><td className="px-5 py-4 text-right text-gray-900">{account.balance.toLocaleString("fr-FR")}</td><td className="px-5 py-4 text-gray-600">{account.currency}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50">
+  <tr>
+    <th className="px-5 py-3 text-left">Compte</th>
+    <th className="px-5 py-3 text-left">Type</th>
+    <th className="px-5 py-3 text-left">Numéro</th>
+    <th className="px-5 py-3 text-left">Gestionnaire</th>
+    <th className="px-5 py-3 text-left">Téléphone</th>
+     <th className="px-5 py-3 text-left">E-mail</th>
+    <th className="px-5 py-3 text-right">Solde</th>
+    <th className="px-5 py-3 text-left">Devise</th>
+  </tr>
+</thead>
+<tbody 
+className="divide-y divide-gray-100">{accounts.map((account) => 
+<tr key={account.id}>
+    <td className="px-5 py-4 font-medium text-gray-900">{account.name}
+        </td>
+        <td className="px-5 py-4 text-gray-600">{account.type === "bank" ? "Banque" : account.type === "mobile_money" ? "Mobile Money" : "Caisse"}
+            </td>
+            <td className="px-5 py-4 text-gray-600">{account.accountNumber || "—"}
+                </td>
+                <td className="px-5 py-4 text-gray-600">
+                    {account.managerName || "—"}
+                </td>
+                <td className="px-5 py-4 text-gray-600">
+                   {account.managerPhone || "—"}
+                </td>
+                <td className="px-5 py-4 text-gray-600">
+                    {account.managerEmail || "—"}
+              </td>
+                <td className="px-5 py-4 text-right text-gray-900">{account.balance.toLocaleString("fr-FR")}
+                    </td>
+                    <td className="px-5 py-4 text-gray-600">{account.currency} 
+                        </td>
+                        </tr>
+                        )}
+                        </tbody>
+                        </table>
+                        </div>
         )}
       </div>
     </div>

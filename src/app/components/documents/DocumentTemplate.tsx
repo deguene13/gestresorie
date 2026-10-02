@@ -11,9 +11,18 @@ export type DocumentData = {
   type: "Facture" | "Bon de commande" | "Bordereau de livraison" | "Devis";
   number: string;
   date: string;
+
+  // Informations de l'entreprise
+  companyName: string;
+  companyAddress: string;
+  companyPhone: string;
+  companyEmail: string;
+
+  // Informations du client
   clientName: string;
   clientAddress: string;
   clientPhone: string;
+
   items: DocumentItem[];
   subtotal: number;
   tvaRate: number;
@@ -22,7 +31,6 @@ export type DocumentData = {
   isPaid?: boolean;
   notes?: string;
 };
-
 type Props = {
   data: DocumentData;
   onDownload: () => void;
@@ -58,15 +66,19 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
                 </svg>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Mon Entreprise</h1>
-                <p className="text-sm font-semibold" style={{ color: "#0F3D91" }}>DIPERFLO</p>
+                <h1 className="text-2xl font-bold text-gray-900">
+                    {data.companyName}
+                </h1>
+
+               <p className="text-sm font-semibold" style={{ color: "#0F3D91" }}>
+                DIPERFLO
+              </p>
               </div>
             </div>
             <div className="text-sm text-gray-700 space-y-1">
-              <p>123 Avenue de la République</p>
-              <p>Dakar, Sénégal</p>
-              <p>Tél: +221 33 000 00 00</p>
-              <p>Email: contact@entreprise.sn</p>
+              <p>{data.companyAddress}</p>
+              <p>Tél: {data.companyPhone}</p>
+              <p>Email: {data.companyEmail}</p>
             </div>
           </div>
 
