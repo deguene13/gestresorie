@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, Eye, TrendingUp, Trash2, X, CheckCircle, XCircle } from "lucide-react";
+import { Search, Plus, Eye, TrendingUp, Trash2, Pencil, X, CheckCircle, XCircle } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import {
   createOtherReceipt,
+   updateTreasuryManualEntry,
   getTreasuryManualEntries,
   getTreasuryAccounts,
   rejectTreasuryManualEntry,
@@ -97,20 +98,32 @@ const isViewOnly = !canManage && !canValidateDG;
     );
 
     setTreasuryAccounts(accounts);
+    console.log(
+  "=== MANUAL ENTRIES AVANT FILTRE ===",
+  manualEntries
+);
+console.log(
+  "=== TYPES DES MANUAL ENTRIES ===",
+  manualEntries.map((entry: any) => ({
+    id: entry.id,
+    transaction_type: entry.transaction_type,
+    amount: entry.amount,
+    status: entry.status,
+  }))
+);
 
     const djangoCollections = manualEntries
-      .filter(
-        (transaction: any) =>
-          transaction.transaction_type === "CREDIT" &&
-          transaction.source === "MANUAL"
-      )
+  .filter(
+    (transaction: any) =>
+      transaction.transaction_type === "CREDIT"
+  )
       .map((transaction: any, index: number) => ({
         id:
           transaction.reference ||
           `ENC-${String(index + 1).padStart(4, "0")}`,
         source:
           transaction.description || "Autre encaissement",
-        type: "other",
+        type: transaction.description?.split(" - ")[1] || "other",
         amount: Number(transaction.amount || 0),
         currency: "FCFA",
         status: "draft",
@@ -159,6 +172,15 @@ console.log(
   "=== MANUAL ENTRY AUTRE ENCAISSEMENT DETAIL ===",
   JSON.stringify(manualEntries[0], null, 2)
 );
+console.log(
+  "=== DESCRIPTIONS DES AUTRES ENCAISSEMENTS ===",
+  manualEntries
+    .filter((entry: any) => entry.transaction_type === "CREDIT")
+    .map((entry: any) => ({
+      id: entry.id,
+      description: entry.description,
+    }))
+);
 
 const djangoCollections = manualEntries
   .filter(
@@ -169,7 +191,7 @@ const djangoCollections = manualEntries
   id: entry.id,
   reference: `ENC-${String(index + 1).padStart(4, "0")}`,
   source: entry.description || "Autre encaissement",
-  type: "other",
+ type: entry.description?.split(" - ")[1]?.trim() || "other",
   amount: Number(entry.amount || 0),
   currency: "FCFA",
   status: entry.status?.toLowerCase() || "draft",
@@ -197,8 +219,9 @@ setCollections(djangoCollections);
 }, []);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedCollection, setSelectedCollection] = useState<any>(null);
+const [showDetailModal, setShowDetailModal] = useState(false);
+const [selectedCollection, setSelectedCollection] = useState<any>(null);
+const [isEditing, setIsEditing] = useState(false);
 
   const [formData, setFormData] = useState({
   source: "",
@@ -215,7 +238,25 @@ setCollections(djangoCollections);
       collection.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       collection.source.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  const handleEdit = (collection: any) => {
+  setSelectedCollection(collection);
 
+  const parts = (collection.source || "").split(" - ");
+
+  setFormData({
+    source: parts[0] || "",
+    type: parts[1] || collection.type || "other",
+    account: collection.account || "",
+    amount: Number(collection.amount || 0),
+    currency: collection.currency || "FCFA",
+    date: collection.date || "",
+    conditions: parts.slice(2).join(" - "),
+  });
+
+  setIsEditing(true);
+  setShowModal(true);
+};
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
@@ -231,16 +272,30 @@ console.log(
   formData.account
 );
 
-const response = await createOtherReceipt({
-  account: formData.account,
-  transaction_type: "CREDIT",
-  amount: String(formData.amount),
-  description: `${formData.source} - ${formData.type}${
-    formData.conditions ? ` - ${formData.conditions}` : ""
-  }`,
-  transaction_date: formData.date,
-});
-    console.log("=== AUTRE ENCAISSEMENT CRÉÉ ===", response);
+const description = `${formData.source} - ${formData.type}${
+  formData.conditions ? ` - ${formData.conditions}` : ""
+}`;
+
+console.log("=== TYPE AVANT MODIFICATION ===", formData.type);
+console.log("=== DESCRIPTION ENVOYÉE ===", description);
+if (isEditing && selectedCollection?.id) {
+  await updateTreasuryManualEntry(selectedCollection.id, {
+    account: formData.account,
+    transaction_type: "CREDIT",
+    amount: String(formData.amount),
+    description,
+    transaction_date: formData.date,
+  });
+} else {
+  await createOtherReceipt({
+    account: formData.account,
+    transaction_type: "CREDIT",
+    amount: String(formData.amount),
+    description,
+    transaction_date: formData.date,
+  });
+}
+   
     await loadCollections();
 
     setShowModal(false);
@@ -265,8 +320,10 @@ const response = await createOtherReceipt({
     date: "",
     conditions: "",
   });
-};
 
+  setSelectedCollection(null);
+  setIsEditing(false);
+};
   const handleViewDetails = (collection: any) => {
     setSelectedCollection(collection);
     setShowDetailModal(true);
@@ -534,6 +591,15 @@ const response = await createOtherReceipt({
                       >
                       <Eye className="w-4 h-4" />
 </button>
+{canManage && collection.status === "draft" && (
+  <button
+    onClick={() => handleEdit(collection)}
+    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+    title="Modifier"
+  >
+    <Pencil className="w-4 h-4" />
+  </button>
+)}
 
 {(canManage || canValidateDG) && collection.status === "draft" && (
   <button
@@ -587,7 +653,9 @@ const response = await createOtherReceipt({
         <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl text-gray-900">Nouvel encaissement</h2>
+              <h2 className="text-xl text-gray-900">
+                {isEditing ? "Modifier l'encaissement" : "Nouvel encaissement"}
+             </h2>
               <button onClick={() => { setShowModal(false); resetForm(); }}>
                 <X className="w-6 h-6 text-gray-400 hover:text-gray-600" />
               </button>
@@ -710,7 +778,7 @@ const response = await createOtherReceipt({
                   type="submit"
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition"
                 >
-                  Créer l'encaissement
+                  {isEditing ? "Modifier l'encaissement" : "Créer l'encaissement"}
                 </button>
               </div>
             </form>

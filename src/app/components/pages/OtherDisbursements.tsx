@@ -7,6 +7,7 @@ import {
   createOtherReceipt,
   getTreasuryTransactions,
   getTreasuryAccounts,
+  updateTreasuryManualEntry,
 } from "../../data/treasuryData";
 
 const initialDisbursements = [
@@ -115,8 +116,10 @@ const [disbursements, setDisbursements] = useState<any[]>(initialDisbursements);
         )
         .map((transaction: any, index: number) => ({
           id: transaction.id,
+          account: transaction.account,
           reason: transaction.description || "Autre décaissement",
-          category: "autre",
+         category:
+           transaction.description?.split(" - ")[1]?.trim() || "autre",
           beneficiary:
             transaction.description?.split(" - ").slice(2).join(" - ") || "—",
           amount: Math.abs(Number(transaction.amount || 0)),
@@ -147,6 +150,10 @@ const [disbursements, setDisbursements] = useState<any[]>(initialDisbursements);
         "=== PREMIER AUTRE DECAISSEMENT ===",
         djangoDisbursements[0]
       );
+      console.log(
+  "=== IDS DECAISSEMENTS ===",
+  djangoDisbursements.map((d: any) => d.id)
+);
 
       setDisbursements(djangoDisbursements);
     } catch (error) {
@@ -186,6 +193,7 @@ const [disbursements, setDisbursements] = useState<any[]>(initialDisbursements);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedDisbursement, setSelectedDisbursement] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   type DisbursementFormData = {
@@ -207,12 +215,18 @@ const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
 });
   const [customCategory, setCustomCategory] = useState("");
 
-  const filteredDisbursements = disbursements.filter(
-    (disbursement) =>
-      disbursement.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      disbursement.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      disbursement.beneficiary.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+ const filteredDisbursements = disbursements.filter(
+  (disbursement) =>
+    String(disbursement.id ?? "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase()) ||
+    String(disbursement.reason ?? "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase()) ||
+    String(disbursement.beneficiary ?? "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -262,13 +276,28 @@ console.log("=== COMPTE FORM DATA ===", formData.account);
 
     console.log("=== PAYLOAD AUTRE DECAISSEMENT ===", payload);
 console.log("=== ACCOUNT ENVOYÉ ===", payload.account);
-    const response = await apiRequest(
-      "/v1/treasury/accounts/other-disbursements/",
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }
-    );
+   let response;
+
+if (isEditing && selectedDisbursement) {
+  response = await updateTreasuryManualEntry(
+    selectedDisbursement.id,
+    {
+      account: formData.account,
+      transaction_type: "DEBIT",
+      amount: String(formData.amount),
+      description: `${formData.reason} - ${effectiveCategory} - ${formData.beneficiary}`,
+      transaction_date: selectedDisbursement.date,
+    }
+  );
+} else {
+  response = await apiRequest(
+    "/v1/treasury/accounts/other-disbursements/",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
 
     console.log(
   "=== REPONSE AUTRE DECAISSEMENT DJANGO ===",
@@ -319,6 +348,35 @@ resetForm();
 
   setCustomCategory("");
   setSelectedFile(null);
+  setIsEditing(false);
+  setSelectedDisbursement(null);
+};
+const handleEdit = (disbursement: any) => {
+  setSelectedDisbursement(disbursement);
+
+  const parts = (disbursement.reason || "").split(" - ");
+
+  setFormData({
+    reason: parts[0] || "",
+    category: parts[1] || disbursement.category || "service",
+    beneficiary: parts.slice(2).join(" - ") || "",
+    amount: Number(disbursement.amount || 0),
+    paymentMethod: disbursement.paymentMethod || "transfer",
+    account: disbursement.account || "",
+  });
+
+  if (parts[1]?.startsWith("autre:")) {
+    setCustomCategory(parts[1].slice(6));
+    setFormData((current) => ({
+      ...current,
+      category: "autre",
+    }));
+  } else {
+    setCustomCategory("");
+  }
+
+  setIsEditing(true);
+  setShowModal(true);
 };
   const handleViewDetails = (disbursement: any) => {
     setSelectedDisbursement(disbursement);
@@ -611,8 +669,11 @@ const handlePay = async (disbursementId: string) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredDisbursements.map((disbursement) => (
-                <tr key={disbursement.id} className="hover:bg-gray-50">
+              {filteredDisbursements.map((disbursement, index) => (
+               <tr
+                 key={`${disbursement.id}-${index}`}
+                 className="hover:bg-gray-50"
+                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {disbursement.reference || disbursement.id}
                   </td>
@@ -651,7 +712,7 @@ const handlePay = async (disbursementId: string) => {
                       </button>
                       {canCreate && disbursement.status !== "approved" && disbursement.status !== "paid" && disbursement.status !== "rejected" && (
                         <button
-                          onClick={() => handleViewDetails(disbursement)}
+                          onClick={() => handleEdit(disbursement)}
                           className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition"
                           title="Modifier"
                         >
@@ -711,7 +772,9 @@ const handlePay = async (disbursementId: string) => {
         <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl max-w-2xl w-full p-6 my-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl text-gray-900">Nouvelle demande de décaissement</h2>
+             <h2 className="text-xl text-gray-900">
+              {isEditing ? "Modifier le décaissement" : "Nouvelle demande de décaissement"}
+            </h2>
               <button onClick={() => { setShowModal(false); resetForm(); }}>
                 <X className="w-6 h-6 text-gray-400 hover:text-gray-600" />
               </button>
@@ -848,7 +911,7 @@ const handlePay = async (disbursementId: string) => {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition"
                 >
-                  Créer la demande
+                 {isEditing ? "Enregistrer les modifications" : "Créer la demande"}
                 </button>
               </div>
             </form>

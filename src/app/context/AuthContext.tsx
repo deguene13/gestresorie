@@ -74,7 +74,6 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "quotes:view",
     "quotes:validate_daf",
     "client_orders:view",
-    "client_orders:validate",
     "client_deliveries:view",
     "client_invoices:view",
     "client_invoices:validate_daf",
