@@ -258,6 +258,33 @@ export async function createOtherReceipt(data: {
   return response;
 }
 
+export async function updateTreasuryManualEntry(
+  id: string,
+  data: {
+    account?: string;
+    transaction_type?: "CREDIT" | "DEBIT";
+    amount?: string;
+    description?: string;
+    beneficiary?: string;
+    transaction_date?: string;
+  }
+) {
+  const response = await apiRequest(
+    `/v1/treasury/manual-entries/${id}/`,
+    {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }
+  );
+
+  console.log(
+    "=== MODIFICATION AUTRE ENCAISSEMENT DJANGO ===",
+    response
+  );
+
+  return response;
+}
+
 export async function rejectTreasuryManualEntry(
   id: string,
   reason: string

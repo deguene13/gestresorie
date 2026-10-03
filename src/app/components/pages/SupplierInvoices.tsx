@@ -1059,20 +1059,24 @@ console.log("Total Django :", selectedInvoice.total_amount);
 console.log("Total final :", total);
 
 return {
-    type: "Facture" as const,
+  type: "Facture" as const,
 
-    number:
-      selectedInvoice.invoice_number ||
-      selectedInvoice.reference ||
-      selectedInvoice.id,
+  number:
+    selectedInvoice.invoice_number ||
+    selectedInvoice.reference ||
+    selectedInvoice.id,
 
-    date: selectedInvoice.invoice_date,
+  date: selectedInvoice.invoice_date,
 
-    clientName: selectedInvoice.supplier,
+  companyName: "",
+  companyAddress: "",
+  companyPhone: "",
+  companyEmail: "",
 
-    clientAddress: "",
+  clientName: selectedInvoice.supplier,
 
-    clientPhone: "",
+  clientAddress: "",
+  clientPhone: "",
 
     items: documentItems,
 

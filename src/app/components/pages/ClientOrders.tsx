@@ -2,9 +2,16 @@ import { useEffect, useState } from "react";
 import { getCustomerOrders } from "../../data/customerOrdersData";
 import { Search } from "lucide-react";
 import { apiRequest } from "../../apiClient";
+import { useAuth } from "../../context/AuthContext";
 
 
 export function ClientOrders() {
+  const { user } = useAuth();
+  const canManageOrders =
+  user?.role === "admin" ||
+  user?.role === "service_commercial";
+  console.log("=== CAN MANAGE ORDERS ===", canManageOrders);
+  console.log("=== RÔLE CLIENT ORDERS ===", user?.role);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -625,9 +632,7 @@ try {
                 <th className="text-center px-5 py-3 font-semibold text-gray-700">
                   Statut
                 </th>
-                 <th className="text-center px-5 py-3 font-semibold text-gray-700">
-                  Voir détail
-                </th>
+                 
                  <th className="text-center px-5 py-3 font-semibold text-gray-700">
                   Actions
                 </th>
@@ -691,29 +696,33 @@ try {
                       {getStatusLabel(order.status)}
                     </span>
                   </td>
-                  {/* Actions */}
+                 {/* Actions */}
 <td className="px-5 py-4">
-  <div className="flex items-center gap-3">
-    <button
-      onClick={() => {
-        console.log("=== DÉTAIL BDC CLIENT ===");
-        console.log(order);
-        setDetailOrder(order);
-      }}
-      className="text-blue-600 hover:text-blue-800 font-medium"
-    >
-      Voir détail
-    </button>
+  <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+  <button
+    onClick={() => {
+      console.log("=== DÉTAIL BDC CLIENT ===");
+      console.log(order);
+      setDetailOrder(order);
+    }}
+    className="text-blue-600 hover:text-blue-800 font-medium"
+  >
+    Voir 
+  </button>
 
-    {order.status === "DELIVERED" && (
+  {canManageOrders && (
+    <>
+      <span className="text-gray-400">/</span>
+
       <button
         onClick={() => setStatusOrder(order)}
         className="text-gray-600 hover:text-gray-900 font-medium"
       >
         Modifier le statut
       </button>
-    )}
-  </div>
+    </>
+  )}
+</div>
 </td>
                 </tr>
               ))}

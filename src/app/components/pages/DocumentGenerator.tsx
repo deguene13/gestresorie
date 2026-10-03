@@ -432,10 +432,7 @@ companyEmail:
   };
   }
   case "supplier-invoices": {
-       console.log(
-    "=== FOURNISSEUR FACTURE ===",
-    JSON.stringify(item.supplier_detail, null, 2)
-  );
+      
   const fullSupplier = suppliers.find(
   (supplier) => supplier.id === item.supplier_detail?.id
 );
@@ -856,10 +853,7 @@ export function DocumentGenerator() {
     try {
       const response = await apiRequest("/v1/users/me/");
 
-      console.log(
-        "=== ENTREPRISE POUR DOCUMENT ===",
-        JSON.stringify(response?.company, null, 2)
-      );
+      
 
       setCompany(response?.company || null);
     } catch (error) {
@@ -875,10 +869,7 @@ useEffect(() => {
     try {
       const response = await apiRequest("/v1/suppliers/");
 
-      console.log(
-        "=== FOURNISSEURS POUR DOCUMENT ===",
-        JSON.stringify(response?.results, null, 2)
-      );
+     
 
       setSuppliers(response?.results || []);
     } catch (error) {
@@ -892,11 +883,6 @@ useEffect(() => {
   const loadCustomers = async () => {
     try {
       const response = await apiRequest("/v1/customers/");
-
-      console.log(
-        "=== CLIENTS POUR DOCUMENT ===",
-        JSON.stringify(response?.results, null, 2)
-      );
 
       setCustomers(response?.results || []);
     } catch (error) {
