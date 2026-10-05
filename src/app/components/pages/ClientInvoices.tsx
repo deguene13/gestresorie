@@ -930,38 +930,47 @@ setEditingInvoiceId(djangoInvoice.id);
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Client selector */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">Sélectionner un client</label>
-                <div className="flex gap-2">
-                  <select
-                    value={selectedClientRef}
-                    onChange={(e) => handleClientSelect(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                  >
-                    <option value="">— Choisir un client —</option>
-                    {availableCustomerDeliveries.map((delivery: any) => (
-                     <option key={delivery.id} value={delivery.id}>
-                      {delivery.customer_detail?.raison_sociale ?? "-"} ({delivery.reference})
-                   </option>
-                 ))}
-                  </select>
-                  {formLocked && (
-                    <button
-                      type="button"
-                      onClick={() => setFormLocked(false)}
-                      className="flex items-center gap-1 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
-                    >
-                      Modifier
-                    </button>
-                  )}
-                </div>
-                {formLocked && (
-                  <p className="mt-1 text-xs text-blue-600">Champs pré-remplis depuis le client sélectionné. Cliquez sur "Modifier" pour éditer manuellement.</p>
-                )}
-              </div>
+              {/* BL client selector */}
+<div>
+  <label className="block text-sm text-gray-700 mb-1">
+    Sélectionner un BL validé
+  </label>
 
-              {/* Client + refs */}
+  <div className="flex gap-2">
+    <select
+      value={selectedClientRef}
+      onChange={(e) => handleClientSelect(e.target.value)}
+      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+    >
+      <option value="">— Choisir un BL validé —</option>
+
+      {availableCustomerDeliveries.map((delivery: any) => (
+        <option key={delivery.id} value={delivery.id}>
+          {delivery.reference} —{" "}
+          {delivery.customer_detail?.raison_sociale ?? "-"}
+        </option>
+      ))}
+    </select>
+
+    {formLocked && (
+      <button
+        type="button"
+        onClick={() => setFormLocked(false)}
+        className="flex items-center gap-1 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
+      >
+        Modifier
+      </button>
+    )}
+  </div>
+
+   {formLocked && (
+    <p className="mt-1 text-xs text-blue-600">
+      Les informations de la facture sont pré-remplies depuis le BL validé sélectionné.
+    </p>
+  )}
+</div>
+
+{/* Client + refs */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-700 mb-1">Client *</label>
