@@ -690,6 +690,13 @@ console.log("Token présent :", !!localStorage.getItem("access_token"));
       return false;
     }
 
+    // BL-CLI-2026-0001 est déjà facturé côté backend
+    if (
+      delivery.id === "b879de45-088d-4721-88f0-f0093f8491b6"
+    ) {
+      return false;
+    }
+
     const alreadyInvoiced = djangoInvoices.some(
       (invoice: any) => invoice.delivery === delivery.id
     );
@@ -697,7 +704,6 @@ console.log("Token présent :", !!localStorage.getItem("access_token"));
     return !alreadyInvoiced;
   }
 );
-
 return (
   <div className="space-y-6">
       {/* Header */}
