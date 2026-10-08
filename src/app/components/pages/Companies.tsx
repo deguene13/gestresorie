@@ -11,6 +11,7 @@ interface Company {
   email: string;
   phone: string;
   address: string;
+  logo: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -21,6 +22,8 @@ const [loading, setLoading] = useState(true);
 const [search, setSearch] = useState("");
 const [showForm, setShowForm] = useState(false);
 const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+const [showCompanyDetail, setShowCompanyDetail] = useState(false);
 const [currentPage, setCurrentPage] = useState(1);
 const [totalPages, setTotalPages] = useState(1);
 const [formData, setFormData] = useState({
@@ -31,6 +34,7 @@ const [formData, setFormData] = useState({
   email: "",
   phone: "",
   address: "",
+  logo: null as File | null,
 });
 const handleCreateCompany = async () => {
   console.log("=== BOUTON ENREGISTRER CLIQUÉ ===");
@@ -50,10 +54,7 @@ const handleCreateCompany = async () => {
 }),
     });
 
-    console.log(
-  "=== RÉPONSE POST ENTREPRISE ===",
-  JSON.stringify(response, null, 2)
-);
+   
 const companyId = response.id;
 
 try {
@@ -87,6 +88,7 @@ setShowForm(false);
 
 const handleEditCompany = async (company: Company) => {
   console.log("=== MODIFICATION ENTREPRISE ===", company);
+  console.log("=== LOGO SÉLECTIONNÉ ===", formData.logo);
 
   try {
     const response = await apiRequest(`/v1/companies/${company.id}/`, {
@@ -108,16 +110,59 @@ const handleEditCompany = async (company: Company) => {
       JSON.stringify(response, null, 2)
     );
 
-    setCompanies((prev) =>
-      prev.map((item) =>
-        item.id === company.id ? response : item
-      )
-    );
+
+    if (formData.logo) {
+      const logoData = new FormData();
+      logoData.append("logo", formData.logo);
+
+      const logoResponse = await apiRequest(
+        `/v1/companies/${company.id}/`,
+        {
+          method: "PATCH",
+          body: logoData,
+        }
+      );
+
+      console.log(
+        "=== RÉPONSE LOGO ENTREPRISE ===",
+        JSON.stringify(logoResponse, null, 2)
+      );
+    }
+
+   setCompanies((prev) =>
+  prev.map((item) =>
+    item.id === company.id
+      ? { ...item, logo: formData.logo ? URL.createObjectURL(formData.logo) : item.logo }
+      : item
+  )
+);
 
     setEditingCompany(null);
     setShowForm(false);
   } catch (error) {
     console.error("Erreur modification entreprise :", error);
+  }
+};
+const handleViewCompany = async (company: Company) => {
+  console.log("=== GET DETAIL ENTREPRISE ===", company.id);
+
+  try {
+    const response = await apiRequest(
+      `/v1/companies/${company.id}/`
+    );
+
+    console.log(
+      "=== DETAIL ENTREPRISE DJANGO ===",
+      JSON.stringify(response, null, 2)
+    );
+
+    setSelectedCompany(response);
+    setShowCompanyDetail(true);
+  } catch (error) {
+    console.error(
+      "=== ERREUR GET DETAIL ENTREPRISE ===",
+      error
+    );
   }
 };
 const handleDeleteCompany = async (company: Company) => {
@@ -365,6 +410,41 @@ const handleDeleteCompany = async (company: Company) => {
   </div>
     </div>
 
+    <div>
+  <label className="block text-sm text-gray-700 mb-2">
+    Logo de l'entreprise
+  </label>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) =>
+      setFormData((prev) => ({
+        ...prev,
+        logo: e.target.files?.[0] || null,
+      }))
+    }
+    className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+  />
+
+  <p className="mt-1 text-xs text-gray-500">
+    Facultatif — formats image uniquement.
+  </p>
+  {editingCompany?.logo && (
+  <div className="mt-3">
+    <p className="text-sm text-gray-600 mb-2">
+      Logo actuel
+    </p>
+
+    <img
+      src={editingCompany.logo}
+      alt={`Logo ${editingCompany.name}`}
+      className="h-20 w-20 object-contain border border-gray-200 rounded-lg p-1"
+    />
+  </div>
+)}
+</div>
+
     <div className="flex justify-end gap-3 mt-5">
       <button
         type="button"
@@ -442,9 +522,23 @@ const handleDeleteCompany = async (company: Company) => {
                 )
               .map((company) => (
               <tr key={company.id} className="border-t border-gray-100">
-                <td className="px-4 py-3 font-medium text-gray-900">
-                  {company.name}
-                </td>
+               <td className="px-4 py-3 font-medium text-gray-900">
+  <div className="flex items-center gap-3">
+    {company.logo ? (
+      <img
+        src={company.logo}
+        alt={`Logo ${company.name}`}
+        className="h-10 w-10 object-contain border border-gray-200 rounded-lg p-1 bg-white"
+      />
+    ) : (
+      <div className="h-10 w-10 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-[10px] text-gray-400">
+        Logo
+      </div>
+    )}
+
+    <span>{company.name}</span>
+  </div>
+</td>
 
                 <td className="px-4 py-3 text-gray-600">
                   {company.legal_form || "—"}
@@ -493,13 +587,22 @@ const handleDeleteCompany = async (company: Company) => {
           email: company.email,
           phone: company.phone,
           address: company.address,
+          logo: null,
         });
         setShowForm(true);
       }}
       className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
     >
+      
       Modifier
     </button>
+    <button
+  type="button"
+  onClick={() => handleViewCompany(company)}
+  className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
+>
+  Voir
+</button>
 
     {company.is_active && (
       <button
@@ -558,6 +661,92 @@ const handleDeleteCompany = async (company: Company) => {
   </button>
 </div>
       </div>
+
+      {showCompanyDetail && selectedCompany && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg bg-white rounded-xl shadow-xl">
+
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Détail de l'entreprise
+              </h2>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCompanyDetail(false);
+                  setSelectedCompany(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5">
+
+              <div className="flex items-center gap-4 mb-6">
+                {selectedCompany.logo ? (
+                  <img
+                    src={selectedCompany.logo}
+                    alt={`Logo ${selectedCompany.name}`}
+                    className="h-20 w-20 object-contain border border-gray-200 rounded-lg p-1"
+                  />
+                ) : (
+                  <div className="h-20 w-20 flex items-center justify-center border border-gray-200 rounded-lg text-xs text-gray-400">
+                    Logo
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {selectedCompany.name}
+                  </p>
+
+                  <p className="text-sm text-gray-500">
+                    {selectedCompany.legal_form || "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                <p>
+                  <span className="text-gray-400">NINEA :</span>{" "}
+                  {selectedCompany.ninea || "—"}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">RCCM :</span>{" "}
+                  {selectedCompany.rccm || "—"}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">Email :</span>{" "}
+                  {selectedCompany.email || "—"}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">Téléphone :</span>{" "}
+                  {selectedCompany.phone || "—"}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">Adresse :</span>{" "}
+                  {selectedCompany.address || "—"}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">Statut :</span>{" "}
+                  {selectedCompany.is_active ? "Active" : "Inactive"}
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
+    
   );
 }

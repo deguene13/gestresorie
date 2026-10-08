@@ -5,6 +5,7 @@ export interface Customer {
   raison_sociale: string;
   ninea: string;
   email: string;
+  logo: string | null;
   phone: string;
   address: string;
   credit_limit: string;

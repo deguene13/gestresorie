@@ -239,6 +239,7 @@ export function DailyTreasury() {
   deleteBankAccount,
 } = useAppData();
   const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
+  const [supplierPayments, setSupplierPayments] = useState<any[]>([]);
   const [selectedDjangoAccountId, setSelectedDjangoAccountId] = useState<string | null>(null);
 const [treasuryTransactions, setTreasuryTransactions] = useState<any[]>([]);
 const [treasuryLoading, setTreasuryLoading] = useState(true);
@@ -290,6 +291,20 @@ console.log(
 const payments = Array.isArray(response)
   ? response
   : response?.results ?? [];
+  setSupplierPayments(payments);
+  console.log(
+  "=== STATUTS PAIEMENTS FOURNISSEURS ===",
+  payments.map((payment: any) => ({
+    reference: payment.reference,
+    status: payment.status,
+    amount: payment.amount,
+  }))
+);
+  console.log(
+  "=== SUPPLIER PAYMENTS POUR KPI ===",
+  payments.length,
+  payments
+);
   console.log(
   "=== PAIEMENTS FOURNISSEUR COMPLETS POUR IMPAYÉS ===",
   JSON.stringify(payments, null, 2)
@@ -914,27 +929,21 @@ console.log("=== INFOS COMPTE ===", {
         transaction.account === account.id
     );
 
-    const encaissements = accountTransactions
-      .filter(
-        (transaction: any) =>
-          transaction.transaction_type === "CREDIT"
-      )
-      .reduce(
-        (total: number, transaction: any) =>
-          total + Number(transaction.amount || 0),
-        0
-      );
+    const encaissements = incoming
+  .filter((p) => p.statut === "Encaissé")
+  .reduce((total, p) => total + p.montant, 0);
 
-    const decaissements = accountTransactions
-      .filter(
-        (transaction: any) =>
-          transaction.transaction_type === "DEBIT"
-      )
-      .reduce(
-        (total: number, transaction: any) =>
-          total + Number(transaction.amount || 0),
-        0
-      );
+    const decaissements = supplierPayments
+  .filter(
+    (payment: any) =>
+      payment.status === "COMPLETED" ||
+      payment.status === "EXECUTED"
+  )
+  .reduce(
+    (total: number, payment: any) =>
+      total + Number(payment.amount || 0),
+    0
+  );
 
   return {
   id: account.id,
@@ -987,8 +996,29 @@ const accountEncaissements = useMemo(
 );
 
 const accountDecaissements = useMemo(
-  () => djangoSelectedAccount?.decaissements ?? 0,
-  [djangoSelectedAccount]
+  () =>
+    supplierPayments
+      .filter(
+        (payment: any) =>
+          payment.status === "COMPLETED" ||
+          payment.status === "EXECUTED"
+      )
+      .reduce(
+        (total: number, payment: any) =>
+          total + Number(payment.amount || 0),
+        0
+      ),
+  [supplierPayments]
+);
+console.log(
+  "=== ACCOUNT DÉCAISSEMENTS FINAL ===",
+  accountDecaissements,
+  "supplierPayments:",
+  supplierPayments.length
+);
+console.log(
+  "=== DÉCAISSEMENTS COMPTE ===",
+  djangoSelectedAccount?.decaissements
 );
 
 const accountOpeningBalance = useMemo(
@@ -1068,13 +1098,49 @@ const engagements: Engagement[] = useMemo(() => {
 
   // ── KPI ────────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
-    const encaissementsAttendus = accountEncaissements;
-    const decaissementsPrevus   = accountDecaissements;
+   console.log(
+  "=== DÉTAIL PAIEMENTS CLIENTS À ENCAISSER ===",
+  incoming
+    .filter((p) => p.statut === "À encaisser")
+    .map((p) => ({
+      reference: p.reference,
+      montant: p.montant,
+      statut: p.statut,
+    }))
+);
+    const encaissementsAttendus = incoming
+  .filter((p) => p.statut === "À encaisser")
+  .reduce((sum, p) => sum + p.montant, 0);
+   const decaissementsPrevus = supplierPayments
+  .filter(
+    (payment: any) =>
+      payment.status === "DRAFT" ||
+      payment.status === "PENDING_DAF" ||
+      payment.status === "PENDING_DG" ||
+      payment.status === "APPROVED"
+  )
+  .reduce(
+    (sum: number, payment: any) => sum + Number(payment.amount),
+    0
+  );
     const engagementsTotal      = engagements.filter((e) => e.statut !== "Payé").reduce((s, e) => s + e.montant, 0);
     const soldePrevisionnel     = accountOpeningBalance + encaissementsAttendus - decaissementsPrevus;
-    const depassement           = soldePrevisionnel < DECOUVERT_PLAFOND ? soldePrevisionnel - DECOUVERT_PLAFOND : 0;
+    console.log("=== DÉPASSEMENT DÉCOUVERT ===", {
+  soldePrevisionnel,
+  DECOUVERT_PLAFOND,
+});
+    const depassement =
+  soldePrevisionnel < DECOUVERT_PLAFOND
+    ? Math.abs(soldePrevisionnel - DECOUVERT_PLAFOND)
+    : 0;
     return { encaissementsAttendus, decaissementsPrevus, engagementsTotal, soldePrevisionnel, depassement };
-  }, [accountEncaissements, accountDecaissements, accountOpeningBalance, engagements]);
+  }, [
+  accountEncaissements,
+  accountDecaissements,
+  accountOpeningBalance,
+  engagements,
+  supplierPayments
+]);
 
   // ── Synthesis ──────────────────────────────────────────────────────────────
  const synthesis = useMemo(() => {
@@ -1141,10 +1207,10 @@ const engagements: Engagement[] = useMemo(() => {
     return [
       { label: "Solde d'ouverture",      montant: selectedAccount.openingBalance },
       { label: "Total encaissements",    montant: selectedAccount.encaissements  },
-      { label: "Total décaissements",    montant: -selectedAccount.decaissements },
+      { label: "Total décaissements", montant: -accountDecaissements },
       { label: "Solde de clôture",       montant: selectedAccount.balance        },
     ];
-  }, [selectedAccount]);
+  }, [selectedAccount, accountDecaissements]);
 
   // ── Filtered data ──────────────────────────────────────────────────────────
   const filteredCirc = useMemo(() => {
@@ -1423,7 +1489,7 @@ managerEmail:
             </div>
             <div className="text-center">
               <p className="text-gray-400">Décaissements</p>
-              <p className="font-semibold text-red-600">-{(djangoSelectedAccount.decaissements / 1_000).toFixed(0)} K</p>
+              <p className="font-semibold text-red-600">-{(accountDecaissements / 1_000).toFixed(0)} K</p>
             </div>
             <div className="text-center">
               <p className="text-gray-400">Solde actuel</p>

@@ -134,9 +134,24 @@ if (!response.ok) {
     errorText
   );
 
-  throw new Error(`Erreur API : ${response.status}`);
-}
+  let errorData: any = null;
 
+  try {
+    errorData = JSON.parse(errorText);
+  } catch {
+    // La réponse n'est pas du JSON
+  }
+
+  const error = new Error(
+    errorData?.error?.message ||
+    `Erreur API : ${response.status}`
+  ) as any;
+
+  error.details = errorData?.error?.details;
+  error.error = errorData?.error;
+
+  throw error;
+}
   if (response.status === 204) {
     return null;
   }

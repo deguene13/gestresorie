@@ -11,7 +11,7 @@ const roles = [
   { label: "Comptable", value: "ACCOUNTANT" },
   { label: "Gestionnaire achats", value: "PURCHASING_MANAGER" },
   { label: "Service Commercial", value: "SALES_MANAGER" },
-  { label: "Fournisseur", value: "SUPPLIER" },
+  
 ];
 
 const initialUsers = [
@@ -105,6 +105,7 @@ export function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [documentMessage, setDocumentMessage] = useState("");
  const [formData, setFormData] = useState({
   first_name: "",
   last_name: "",
@@ -378,7 +379,8 @@ console.log(
    });
 
     console.log("=== UTILISATEUR AJOUTÉ AU FRONTEND ===");
-  } catch (error: any) {
+
+} catch (error: any) {
   console.error(
     "=== ERREUR CRÉATION/MODIFICATION UTILISATEUR ===",
     error
@@ -388,21 +390,28 @@ console.log(
     error?.details?.email?.[0] ||
     error?.message ||
     "";
+    console.log("=== MESSAGE ERREUR EMAIL ===", errorMessage);
+console.log("=== ERREUR COMPLÈTE ===", error);
 
-  if (errorMessage.includes("déjà utilisé")) {
-    alert(
+  if (
+    errorMessage.toLowerCase().includes("déjà") &&
+    errorMessage.toLowerCase().includes("email")
+  ) {
+    setDocumentMessage(
       lang === "fr"
-        ? "Cette adresse email est déjà utilisée par un autre utilisateur."
-        : "This email address is already used by another user."
+        ? "Cet email existe déjà."
+        : "This email already exists."
     );
   } else {
-    alert(
+    setDocumentMessage(
       lang === "fr"
         ? "Une erreur est survenue lors de l'enregistrement de l'utilisateur."
         : "An error occurred while saving the user."
     );
   }
 }
+
+
 };
 
  const handleDelete = async (id: string) => {
@@ -679,6 +688,11 @@ console.log(
                   placeholder="jean.dupont@entreprise.fr"
                   required
                 />
+                {documentMessage && (
+                  <p className="mt-2 text-sm font-medium text-red-600">
+                    {documentMessage}
+                 </p>
+    )}
               </div>
               <div>
               <label className="block text-sm text-gray-700 mb-2">Téléphone</label>

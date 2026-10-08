@@ -229,6 +229,7 @@ const isViewOnly =
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [djangoInvoices, setDjangoInvoices] = useState<any[]>([]);
   const [customerDeliveries, setCustomerDeliveries] = useState<any[]>([]);
+  const [documentMessage, setDocumentMessage] = useState("");
 
   const mappedDjangoInvoices: Invoice[] = djangoInvoices.map((invoice) => ({
   id: invoice.reference,
@@ -332,9 +333,12 @@ const isViewOnly =
     setFormItems(formItems.map(i => i.id === id ? { ...i, [field]: value } : i));
   };
 
-  // Client auto-fill
-  const handleClientSelect = (deliveryId: string) => {
+  
+// Client auto-fill
+
+const handleClientSelect = (deliveryId: string) => {
   setSelectedClientRef(deliveryId);
+  setDocumentMessage("");
 
   if (!deliveryId) {
     setFormLocked(false);
@@ -346,6 +350,17 @@ const isViewOnly =
   );
 
   if (!delivery) return;
+
+  // Vérifier si le BL est déjà facturé
+  const alreadyInvoiced = djangoInvoices.some(
+    (invoice: any) => invoice.delivery === delivery.id
+  );
+
+  if (alreadyInvoiced) {
+    setDocumentMessage("Ce BL est déjà facturé.");
+    setFormLocked(false);
+    return;
+  }
 
   setFormData(prev => ({
     ...prev,
@@ -360,16 +375,23 @@ const isViewOnly =
       id: idx + 1,
       designation: item.product_detail?.name ?? "",
       quantity: Number(
-        item.quantity_delivered ?? item.quantity_ordered ?? item.quantity ?? 0
+        item.quantity_delivered ??
+          item.quantity_ordered ??
+          item.quantity ??
+          0
       ),
       unitPrice: Number(
-        item.product_detail?.unit_price ?? item.unit_price ?? 0
+        item.product_detail?.unit_price ??
+          item.unit_price ??
+          0
       ),
     }))
   );
 
   setFormLocked(true);
 };
+
+
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
@@ -928,7 +950,7 @@ setEditingInvoiceId(djangoInvoice.id);
       {/* New Invoice Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-3xl w-full p-6 my-8">
+          <div className="bg-white rounded-xl max-w-3xl w-full p-6 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl text-gray-900">Nouvelle facture client</h2>
               <button onClick={() => { setShowModal(false); resetForm(); }}>
@@ -957,6 +979,11 @@ setEditingInvoiceId(djangoInvoice.id);
         </option>
       ))}
     </select>
+    {documentMessage && (
+     <p className="mt-2 text-sm font-medium text-red-600">
+      {documentMessage}
+    </p>
+     )}
 
     {formLocked && (
       <button

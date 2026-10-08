@@ -109,29 +109,40 @@ export function ClientDeliveries() {
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [documentMessage, setDocumentMessage] = useState("");
 
   const confirmedOrders = customerOrders.filter(
     (order) => order.status === "CONFIRMED"
   );
 
-  const handleOrderChange = (orderId: string) => {
-    setSelectedOrderId(orderId);
+ const handleOrderChange = (orderId: string) => {
+  setSelectedOrderId(orderId);
 
-    const order = confirmedOrders.find(
-      (item) => item.id === orderId
-    );
+  const order = confirmedOrders.find(
+    (item) => item.id === orderId
+  );
 
-    if (!order) {
-      setSelectedOrder(null);
-      return;
-    }
+  if (!order) {
+    setSelectedOrder(null);
 
-    setSelectedOrder(order);
+    setFormData((prev) => ({
+      ...prev,
+      client: "",
+    }));
 
-    console.log("=== BDC CLIENT SÉLECTIONNÉ ===");
-    console.log(JSON.stringify(order, null, 2));
-  };
+    return;
+  }
 
+  setSelectedOrder(order);
+
+  setFormData((prev) => ({
+    ...prev,
+    client: order.customer_detail?.raison_sociale || "",
+  }));
+
+  console.log("=== BDC CLIENT SÉLECTIONNÉ ===");
+  console.log(JSON.stringify(order, null, 2));
+};
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedDelivery, setSelectedDelivery] =
     useState<ClientDelivery | null>(null);
@@ -298,12 +309,22 @@ export function ClientDeliveries() {
       resetForm();
       setSelectedOrderId("");
       setSelectedOrder(null);
-    } catch (error) {
-      console.error(
-        "=== ERREUR POST LIVRAISON CLIENT DJANGO ===",
-        error
-      );
-    }
+    
+} catch (error: any) {
+  console.error(
+    "=== ERREUR POST LIVRAISON CLIENT DJANGO ===",
+    error
+  );
+
+  const message =
+    error?.message ??
+    error?.error?.message ??
+    "Ce BDC est déjà utilisé pour un BL.";
+
+  setDocumentMessage(message);
+}
+
+
   };
 
   const resetForm = () => {
@@ -849,6 +870,11 @@ export function ClientDeliveries() {
                       )
                     )}
                   </select>
+                  {documentMessage && (
+                    <p className="mt-2 text-sm font-medium text-red-600">
+                       {documentMessage}
+                    </p>
+          )}
 
                   {selectedOrder && (
                     <div className="mt-4 border border-gray-200 rounded-lg p-4 bg-gray-50">

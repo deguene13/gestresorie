@@ -255,6 +255,7 @@ function toDocData(
 companyAddress: company?.address || "—",
 companyPhone: company?.phone || "—",
 companyEmail: company?.email || "—",
+companyLogo: company?.logo || null,
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -295,6 +296,7 @@ companyEmail: company?.email || "—",
 companyAddress: company?.address || "—",
 companyPhone: company?.phone || "—",
 companyEmail: company?.email || "—",
+companyLogo: company?.logo || null,
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -336,6 +338,7 @@ companyEmail: company?.email || "—",
 companyAddress: company?.address || "—",
 companyPhone: company?.phone || "—",
 companyEmail: company?.email || "—",
+companyLogo: company?.logo || null,
 
     clientName: item.supplier_detail?.raison_sociale || "—",
 
@@ -375,6 +378,12 @@ companyEmail: company?.email || "—",
     (customer) => customer.id === item.customer_detail?.id
   );
 
+  console.log("=== CLIENT DOCUMENT ===", {
+    customerId: item.customer_detail?.id,
+    customerName: item.customer_detail?.raison_sociale,
+    fullCustomer,
+    logo: fullCustomer?.logo,
+  });
   return {
     type: "Facture",
 
@@ -401,6 +410,7 @@ companyEmail:
     clientAddress: "—",
 
     clientPhone: item.customer_detail?.email || "—",
+    clientLogo: fullCustomer?.logo || null,
 
     items: (item.lines || []).map((i: any) => ({
       designation: i.product_detail?.name || "—",
@@ -466,6 +476,7 @@ companyEmail:
 
     clientPhone:
       item.supplier_detail?.email || "—",
+      clientLogo: fullSupplier?.logo || null,
 
     items: (item.lines || []).map((line: any) => ({
       designation:
@@ -543,6 +554,7 @@ companyEmail:
 
     clientPhone:
       item.supplier_detail?.email || "—",
+      clientLogo: fullSupplier?.logo || null,
 
     items: (item.items || []).map((i: any) => {
   const quantity = Number(i.quantity_received || 0);
@@ -627,6 +639,7 @@ companyEmail:
     clientAddress: "—",
 
     clientPhone: item.customer_detail?.email || "—",
+    clientLogo: fullCustomer?.logo || null,
 
     items: (item.items || []).map((i: any) => ({
       designation: `${i.product_detail?.name || "—"} (livré: ${Number(
@@ -853,9 +866,24 @@ export function DocumentGenerator() {
     try {
       const response = await apiRequest("/v1/users/me/");
 
-      
+console.log(
+  "=== ENTREPRISE CONNECTÉE POUR DOCUMENT ===",
+  JSON.stringify(response?.company, null, 2)
+);
 
-      setCompany(response?.company || null);
+const companyData = response?.company
+  ? {
+      ...response.company,
+      logo: response.company.logo
+        ? new URL(
+            response.company.logo,
+            "https://api.bbcons.net"
+          ).toString()
+        : null,
+    }
+  : null;
+
+setCompany(companyData);
     } catch (error) {
       console.error("Erreur récupération entreprise :", error);
     }
@@ -884,7 +912,12 @@ useEffect(() => {
     try {
       const response = await apiRequest("/v1/customers/");
 
-      setCustomers(response?.results || []);
+console.log(
+  "=== CLIENTS CHARGÉS POUR LIASSE ===",
+  JSON.stringify(response?.results || [], null, 2)
+);
+
+setCustomers(response?.results || []);
     } catch (error) {
       console.error("Erreur récupération clients :", error);
     }

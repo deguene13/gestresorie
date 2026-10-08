@@ -51,12 +51,12 @@ type Payment = {
   amount: number;
   moyenPaiement: MoyenPaiement;
   referenceNumber: string;
+  cheque_number?: string;
   status: PaymentStatus;
   date: string;
   dueDate: string;
   notes: string;
 };
-
 const initialPayments: Payment[] = [
   {
     id: "PAY-2024-445",
@@ -335,6 +335,7 @@ const [totalPages, setTotalPages] = useState(1);
 const [supplierInvoices, setSupplierInvoices] = useState<any[]>([]);
 const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
   const [showAccountForm, setShowAccountForm] = useState(false);
+  const [documentMessage, setDocumentMessage] = useState("");
   const [accountForm, setAccountForm] = useState<TreasuryAccountForm>({
     name: "",
     accountType: "BANK",
@@ -416,31 +417,33 @@ async function loadPayments() {
     normalizedStatus = "dg_validated";
   }
 
-  return {
-    ...payment,
+ return {
+  ...payment,
 
-    reference: payment.reference || "",
-    invoiceRef: payment.invoice_reference || "",
-    supplier: payment.supplier_name || "",
-    amount: Number(payment.amount || 0),
+  reference: payment.reference || "",
+  invoiceRef: payment.invoice_reference || "",
+  supplier: payment.supplier_name || "",
+  amount: Number(payment.amount || 0),
 
-    moyenPaiement:
-      payment.payment_method === "BANK_TRANSFER"
-        ? "virement"
-        : payment.payment_method === "CHECK"
-        ? "cheque"
-        : payment.payment_method === "BILL_OF_EXCHANGE"
-        ? "traite"
-        : payment.payment_method === "TRANSFER_ORDER"
-        ? "ordre_transfert"
-        : "virement",
+  cheque_number: payment.cheque_number || "",
 
-    status: normalizedStatus,
+  moyenPaiement:
+    payment.payment_method === "BANK_TRANSFER"
+      ? "virement"
+      : payment.payment_method === "CHECK"
+      ? "cheque"
+      : payment.payment_method === "BILL_OF_EXCHANGE"
+      ? "traite"
+      : payment.payment_method === "TRANSFER_ORDER"
+      ? "ordre_transfert"
+      : "virement",
 
-    date: payment.scheduled_date || payment.created_at || "",
-    dueDate: payment.scheduled_date || "",
-    notes: payment.notes || "",
-  };
+  status: normalizedStatus,
+
+  date: payment.scheduled_date || payment.created_at || "",
+  dueDate: payment.scheduled_date || "",
+  notes: payment.notes || "",
+};
 });
 console.log(
   "=== PAIEMENTS NORMALISES ===",
@@ -773,7 +776,12 @@ async function handleCreateTreasuryAccount() {
   alert("Veuillez sélectionner une facture approuvée.");
   return;
 }
-    const payload = {
+console.log("=== DEBUG NUMERO CHEQUE ===", {
+  moyenPaiement: formData.moyenPaiement,
+  referenceNumber: formData.referenceNumber,
+});
+
+   const payload = {
   invoice: formData.invoiceId,
   treasury_account: formData.treasuryAccountId,
   payment_method: mapMoyenPaiementToDjango(
@@ -782,8 +790,13 @@ async function handleCreateTreasuryAccount() {
   amount: formData.amount,
   currency: "XOF",
   scheduled_date: formData.dueDate || new Date().toISOString().split("T")[0],
+  cheque_number:
+    formData.moyenPaiement === "cheque"
+      ? formData.referenceNumber
+      : "",
   notes: formData.notes,
 };
+console.log("=== PAYLOAD ENVOYÉ DJANGO ===", payload);
 
 console.log("=== CREATION PAIEMENT DJANGO ===", payload);
 
@@ -799,10 +812,18 @@ try {
 
   setFormData(emptyForm);
   setShowModal(false);
+
 } catch (err: any) {
   console.error("=== ERREUR CREATION PAIEMENT ===", err);
-  alert(err?.message || "Impossible de créer le paiement.");
+
+  const message =
+    err?.message ||
+    "Cette facture a déjà un paiement créé.";
+
+  setDocumentMessage(message);
 }
+
+
   }
 
   return (
@@ -1124,6 +1145,7 @@ try {
     "=== FACTURE SÉLECTIONNÉE POUR PAIEMENT ===",
     invoice
   );
+  setDocumentMessage("");
 
   setFormData((f) => ({
     ...f,
@@ -1143,6 +1165,11 @@ try {
     </option>
   ))}
 </select>
+{documentMessage && (
+  <p className="mt-2 text-sm font-medium text-red-600">
+    {documentMessage}
+  </p>
+)}
               </div>
               <div>
                 <label className="block text-sm text-gray-700 mb-1">
@@ -1456,9 +1483,11 @@ try {
                   <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">
                     {moyenConfig[selectedPayment.moyenPaiement]?.refLabel}
                   </p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {selectedPayment.referenceNumber || "—"}
-                  </p>
+                 <p className="text-sm font-medium text-gray-900">
+                  {selectedPayment.moyenPaiement === "cheque"
+                  ? selectedPayment.cheque_number || "—"
+                  : selectedPayment.referenceNumber || "—"}
+                </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">

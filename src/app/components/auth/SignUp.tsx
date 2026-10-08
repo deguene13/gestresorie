@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router";
 import {
   Mail,
@@ -24,22 +24,37 @@ export function SignUp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [formData, setFormData] = useState({
-    company_name: "",
-    legal_form: "SARL",
-    ninea: "",
-    rccm: "",
-    company_email: "",
-    company_phone: "",
-    address: "",
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    password: "",
-    confirmPassword: "",
-  });
-
+  const [formData, setFormData] = useState<{
+  company_name: string;
+  legal_form: string;
+  ninea: string;
+  rccm: string;
+  company_email: string;
+  company_phone: string;
+  address: string;
+  logo: File | null;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+}>({
+  company_name: "",
+  legal_form: "SARL",
+  ninea: "",
+  rccm: "",
+  company_email: "",
+  company_phone: "",
+  address: "",
+  logo: null,
+  first_name: "",
+  last_name: "",
+  email: "",
+  phone: "",
+  password: "",
+  confirmPassword: "",
+});
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -208,6 +223,32 @@ if (response?.company_id) {
                     />
                   </div>
                 </div>
+                {/* Logo entreprise */}
+<div className="md:col-span-2">
+  <label className="block text-sm text-gray-700 mb-2">
+    {lang === "fr"
+      ? "Logo de l'entreprise"
+      : "Company logo"}
+  </label>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) =>
+      setFormData((prev) => ({
+        ...prev,
+        logo: e.target.files?.[0] || null,
+      }))
+    }
+    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white"
+  />
+
+  <p className="mt-1 text-xs text-gray-500">
+    {lang === "fr"
+      ? "Facultatif — formats image uniquement."
+      : "Optional — image formats only."}
+  </p>
+</div>
 
                 {/* Forme juridique */}
                 <div>
@@ -239,6 +280,7 @@ if (response?.company_id) {
                     </option>
                   </select>
                 </div>
+                
 
                 {/* NINEA */}
                 <div>

@@ -15,6 +15,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useAppData } from "../../context/AppDataContext";
 import type { Customer } from "../../data/customersData";
+import { apiRequest } from "../../apiClient";
 
 import {
   getCustomers,
@@ -29,6 +30,7 @@ type FormState = {
   email: string;
   phone: string;
   address: string;
+  logo: File | null;
   credit_limit: string;
   payment_terms: number;
 };
@@ -39,6 +41,7 @@ const emptyForm: FormState = {
   email: "",
   phone: "",
   address: "",
+  logo: null,
   credit_limit: "0",
   payment_terms: 30,
 };
@@ -56,6 +59,11 @@ export function ClientManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] =
     useState<Customer | null>(null);
+    const [selectedCustomer, setSelectedCustomer] =
+  useState<Customer | null>(null);
+
+const [showCustomerDetail, setShowCustomerDetail] =
+  useState(false);
 
   const [form, setForm] =
     useState<FormState>(emptyForm);
@@ -129,6 +137,7 @@ const fmt = (value: string | number) =>
     email: client.email || "",
     phone: client.phone || "",
     address: client.address || "",
+    logo: null,
     credit_limit: String(client.credit_limit || "0"),
     payment_terms: Number(client.payment_terms || 30),
   });
@@ -169,8 +178,7 @@ const handleSubmit = async () => {
       return;
     }
 
-   const emailRegex =
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailRegex.test(email)) {
       addNotification({
@@ -201,10 +209,32 @@ const handleSubmit = async () => {
         }
       );
 
+      let updatedWithLogo = updated;
+
+      if (form.logo) {
+        const logoData = new FormData();
+        logoData.append("logo", form.logo);
+
+        const logoResponse = await apiRequest(
+          `/v1/customers/${editingClient.id}/`,
+          {
+            method: "PATCH",
+            body: logoData,
+          }
+        );
+
+        console.log(
+          "=== LOGO CLIENT ENREGISTRE DJANGO ===",
+          JSON.stringify(logoResponse, null, 2)
+        );
+
+        updatedWithLogo = logoResponse;
+      }
+
       setClients((prev) =>
         prev.map((client) =>
-          client.id === updated.id
-            ? updated
+          client.id === updatedWithLogo.id
+            ? updatedWithLogo
             : client
         )
       );
@@ -217,6 +247,7 @@ const handleSubmit = async () => {
       });
 
     } else {
+
       // ==============================
       // CREATION DU CLIENT
       // ==============================
@@ -232,8 +263,30 @@ const handleSubmit = async () => {
         is_active: true,
       });
 
+      let createdWithLogo = created;
+
+      if (form.logo) {
+        const logoData = new FormData();
+        logoData.append("logo", form.logo);
+
+        const logoResponse = await apiRequest(
+          `/v1/customers/${created.id}/`,
+          {
+            method: "PATCH",
+            body: logoData,
+          }
+        );
+
+        console.log(
+          "=== LOGO CLIENT ENREGISTRE DJANGO ===",
+          JSON.stringify(logoResponse, null, 2)
+        );
+
+        createdWithLogo = logoResponse;
+      }
+
       setClients((prev) => [
-        created,
+        createdWithLogo,
         ...prev,
       ]);
 
@@ -265,6 +318,30 @@ const handleSubmit = async () => {
       message: "Impossible d'enregistrer le client.",
       module: "Clients",
     });
+  }
+};
+
+const handleViewCustomer = async (customer: Customer) => {
+  console.log("=== GET DETAIL CLIENT ===", customer.id);
+
+  try {
+    const response = await apiRequest(
+      `/v1/customers/${customer.id}/`
+    );
+
+    console.log(
+      "=== DETAIL CLIENT DJANGO ===",
+      JSON.stringify(response, null, 2)
+    );
+
+    setSelectedCustomer(response);
+    setShowCustomerDetail(true);
+
+  } catch (error) {
+    console.error(
+      "=== ERREUR GET DETAIL CLIENT ===",
+      error
+    );
   }
 };
 
@@ -425,11 +502,11 @@ const handleSubmit = async () => {
     </th>
 
     <th className="p-3 text-left">
-      Limite de crédit
+      Encours
     </th>
 
     <th className="p-3 text-left">
-      Conditions de paiement
+     Délai client
     </th>
 
     <th className="p-3 text-left">
@@ -462,9 +539,23 @@ const handleSubmit = async () => {
       >
 
         {/* NOM / RAISON SOCIALE */}
-        <td className="p-3">
-          {client.raison_sociale}
-        </td>
+<td className="p-3">
+  <div className="flex items-center gap-3">
+    {client.logo ? (
+      <img
+        src={client.logo}
+        alt={`Logo ${client.raison_sociale}`}
+        className="h-10 w-10 object-contain border border-gray-200 rounded-lg p-1 bg-white"
+      />
+    ) : (
+      <div className="h-10 w-10 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-[10px] text-gray-400">
+        Logo
+      </div>
+    )}
+
+    <span>{client.raison_sociale}</span>
+  </div>
+</td>
 
         {/* NINEA */}
         <td className="p-3">
@@ -515,6 +606,13 @@ const handleSubmit = async () => {
         <td className="p-3">
           {canManage && (
             <div className="flex gap-2">
+              <button
+  type="button"
+  onClick={() => handleViewCustomer(client)}
+  className="px-2 py-1 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50"
+>
+  Voir
+</button>
 
               <button
                 onClick={() =>
@@ -682,6 +780,28 @@ const handleSubmit = async () => {
       className="w-full border rounded-lg p-2.5"
     />
   </div>
+    {/* Logo */}
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Logo du client
+    </label>
+
+    <input
+      type="file"
+      accept="image/*"
+      onChange={(e) =>
+        setForm((prev) => ({
+          ...prev,
+          logo: e.target.files?.[0] || null,
+        }))
+      }
+      className="w-full border rounded-lg p-2.5"
+    />
+
+    <p className="mt-1 text-xs text-gray-500">
+      Facultatif — formats image uniquement.
+    </p>
+  </div>
 
   {/* Crédit et conditions */}
  {/* Crédit */}
@@ -690,7 +810,7 @@ const handleSubmit = async () => {
   {/* Limite de crédit */}
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1">
-      Limite de crédit
+      Encours
     </label>
 
     <input
@@ -711,7 +831,7 @@ const handleSubmit = async () => {
   {/* Conditions de paiement */}
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1">
-      Conditions de paiement
+      Délai client
     </label>
 
     <input
@@ -748,7 +868,98 @@ const handleSubmit = async () => {
           </div>
 
         </div>
+      )}
 
+      {showCustomerDetail && selectedCustomer && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Détail du client
+              </h2>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCustomerDetail(false);
+                  setSelectedCustomer(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5">
+
+              <div className="flex items-center gap-4 mb-6">
+                {selectedCustomer.logo ? (
+                  <img
+                    src={selectedCustomer.logo}
+                    alt={`Logo ${selectedCustomer.raison_sociale}`}
+                    className="h-20 w-20 object-contain border border-gray-200 rounded-lg p-1 bg-white"
+                  />
+                ) : (
+                  <div className="h-20 w-20 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-xs text-gray-400">
+                    Logo
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {selectedCustomer.raison_sociale}
+                  </p>
+
+                  <p className="text-sm text-gray-500">
+                    {selectedCustomer.ninea || "NINEA non renseigné"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm">
+
+                <p>
+                  <span className="text-gray-400">Email :</span>{" "}
+                  {selectedCustomer.email || "—"}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">Téléphone :</span>{" "}
+                  {selectedCustomer.phone || "—"}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">Adresse :</span>{" "}
+                  {selectedCustomer.address || "—"}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">
+                    Limite de crédit :
+                  </span>{" "}
+                  {fmt(selectedCustomer.credit_limit)}
+                </p>
+
+                <p>
+                  <span className="text-gray-400">
+                    Conditions de paiement :
+                  </span>{" "}
+                  {selectedCustomer.payment_terms} jours
+                </p>
+
+                <p>
+                  <span className="text-gray-400">Statut :</span>{" "}
+                  {selectedCustomer.is_active
+                    ? "Actif"
+                    : "Inactif"}
+                </p>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
       )}
 
     </div>

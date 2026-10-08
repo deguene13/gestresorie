@@ -109,6 +109,7 @@ interface SupplierUI {
   contact: string;
   phone: string;
   email: string;
+  logo: string | null;
   adresse: string;
   ninea: string;
   rccm: string;
@@ -424,6 +425,7 @@ console.log(
     contact: supplier.contact_principal_nom || "",
     phone: supplier.phone || "",
     email: supplier.email || "",
+    logo: supplier.logo || null,
     adresse: supplier.address || "",
     ninea: supplier.ninea || "",
     rccm: supplier.rccm || "",
@@ -663,6 +665,7 @@ const [supplierForm, setSupplierForm] = useState({
   email: "",
   phone: "",
   address: "",
+  logo: null as File | null,
   contact_principal_nom: "",
   contact_principal_email: "",
   contact_principal_phone: "",
@@ -670,7 +673,6 @@ const [supplierForm, setSupplierForm] = useState({
   currency: "XOF",
   is_active: true,
 });
-
 
   /* Upload state */
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -748,6 +750,7 @@ const handleViewSupplier = async (supplier: SupplierUI) => {
       contact: response.contact_principal_nom || "",
       phone: response.phone || "",
       email: response.email || "",
+      logo: response.logo || null,
       adresse: response.address || "",
       ninea: response.ninea || "",
       rccm: response.rccm || "",
@@ -800,8 +803,18 @@ const handleCreateSupplier = async () => {
       {
         method: editingSupplierId ? "PUT" : "POST",
         body: JSON.stringify({
-          ...supplierForm,
+          raison_sociale: supplierForm.raison_sociale,
+          ninea: supplierForm.ninea,
+          rccm: supplierForm.rccm,
+          email: supplierForm.email,
+          phone: supplierForm.phone,
+          address: supplierForm.address,
+          contact_principal_nom: supplierForm.contact_principal_nom,
+          contact_principal_email: supplierForm.contact_principal_email,
+          contact_principal_phone: supplierForm.contact_principal_phone,
           payment_terms: Number(supplierForm.payment_terms),
+          currency: supplierForm.currency,
+          is_active: supplierForm.is_active,
         }),
       }
     );
@@ -810,6 +823,26 @@ const handleCreateSupplier = async () => {
       "=== FOURNISSEUR ENREGISTRE DJANGO ===",
       JSON.stringify(response, null, 2)
     );
+
+    const supplierId = editingSupplierId || response.id;
+
+    if (supplierForm.logo) {
+      const logoData = new FormData();
+      logoData.append("logo", supplierForm.logo);
+
+      const logoResponse = await apiRequest(
+        `/v1/suppliers/${supplierId}/`,
+        {
+          method: "PATCH",
+          body: logoData,
+        }
+      );
+
+      console.log(
+        "=== LOGO FOURNISSEUR ENREGISTRE DJANGO ===",
+        JSON.stringify(logoResponse, null, 2)
+      );
+    }
 
     addNotification({
       type: "success",
@@ -824,34 +857,37 @@ const handleCreateSupplier = async () => {
     });
 
     if (editingSupplierId) {
-  setSuppliers((currentSuppliers) =>
-    currentSuppliers.map((supplier) =>
-      supplier.id === editingSupplierId
-        ? {
-            ...supplier,
-            name: response.raison_sociale || "",
-            contact: response.contact_principal_nom || "",
-            phone: response.phone || "",
-            email: response.email || "",
-            adresse: response.address || "",
-            ninea: response.ninea || "",
-            rccm: response.rccm || "",
-            contactPrincipalEmail:
-              response.contact_principal_email || "",
-            contactPrincipalPhone:
-              response.contact_principal_phone || "",
-            paymentTerms: Number(response.payment_terms || 0),
-            currency: response.currency || "XOF",
-            status: response.is_active ? "Actif" : "Inactif",
-            updatedAt: response.updated_at,
-          }
-        : supplier
-    )
-  );
-}
+      setSuppliers((currentSuppliers) =>
+        currentSuppliers.map((supplier) =>
+          supplier.id === editingSupplierId
+            ? {
+                ...supplier,
+                name: response.raison_sociale || "",
+                contact: response.contact_principal_nom || "",
+                phone: response.phone || "",
+                email: response.email || "",
+                logo: supplierForm.logo
+                  ? URL.createObjectURL(supplierForm.logo)
+                  : response.logo || supplier.logo,
+                adresse: response.address || "",
+                ninea: response.ninea || "",
+                rccm: response.rccm || "",
+                contactPrincipalEmail:
+                  response.contact_principal_email || "",
+                contactPrincipalPhone:
+                  response.contact_principal_phone || "",
+                paymentTerms: Number(response.payment_terms || 0),
+                currency: response.currency || "XOF",
+                status: response.is_active ? "Actif" : "Inactif",
+                updatedAt: response.updated_at,
+              }
+            : supplier
+        )
+      );
+    }
 
-setShowSupplierForm(false);
-setEditingSupplierId(null);
+    setShowSupplierForm(false);
+    setEditingSupplierId(null);
 
   } catch (error) {
     console.error(
@@ -869,7 +905,6 @@ setEditingSupplierId(null);
     });
   }
 };
-
 const handleDeleteSupplier = async (supplier: SupplierUI) => {
   console.log("=== SUPPRESSION FOURNISSEUR DJANGO ===");
   console.log("=== FOURNISSEUR ID ===", supplier.id);
@@ -1227,38 +1262,53 @@ setUploadProgress(30);
         setActiveTab("bdc");
       }}
       className="flex-1 text-left min-w-0"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-gray-800 truncate">
-          {f.name}
-        </p>
+    ><div className="flex items-start gap-3">
+  {f.logo ? (
+    <img
+      src={f.logo}
+      alt={`Logo ${f.name}`}
+      className="h-10 w-10 shrink-0 object-contain border border-gray-200 rounded-lg p-1 bg-white"
+    />
+  ) : (
+    <div className="h-10 w-10 shrink-0 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-[10px] text-gray-400">
+      Logo
+    </div>
+  )}
 
-        <div className="flex items-center gap-1 shrink-0">
-          {pendingInv > 0 && (
-            <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">
-              {pendingInv}
-            </span>
-          )}
+  <div className="flex-1 min-w-0">
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-sm font-semibold text-gray-800 truncate">
+        {f.name}
+      </p>
 
-          <span
-            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-              f.status === "Actif"
-                ? "bg-green-100 text-green-700"
-                : "bg-gray-100 text-gray-500"
-            }`}
-          >
-            {f.status}
+      <div className="flex items-center gap-1 shrink-0">
+        {pendingInv > 0 && (
+          <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">
+            {pendingInv}
           </span>
-        </div>
+        )}
+
+        <span
+          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+            f.status === "Actif"
+              ? "bg-green-100 text-green-700"
+              : "bg-gray-100 text-gray-500"
+          }`}
+        >
+          {f.status}
+        </span>
       </div>
+    </div>
 
-      <p className="text-xs text-gray-500 mt-0.5">
-        {f.category}
-      </p>
+    <p className="text-xs text-gray-500 mt-0.5">
+      {f.category}
+    </p>
 
-      <p className="text-xs text-gray-400 mt-0.5">
-        {f.contact}
-      </p>
+    <p className="text-xs text-gray-400 mt-0.5">
+      {f.contact}
+    </p>
+  </div>
+</div>
     </button>
 
     <div className="flex items-center gap-2 shrink-0">
@@ -1290,6 +1340,7 @@ setUploadProgress(30);
     email: f.email || "",
     phone: f.phone || "",
     address: f.adresse || "",
+    logo: null,
     contact_principal_nom: f.contact || "",
     contact_principal_email: f.contactPrincipalEmail || "",
     contact_principal_phone: f.contactPrincipalPhone || "",
@@ -1609,9 +1660,17 @@ setUploadProgress(30);
 
       <div className="flex items-center justify-between p-5 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-blue-700" />
-          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center overflow-hidden">
+  {supplierDetail?.logo ? (
+    <img
+      src={supplierDetail.logo}
+      alt={`Logo ${supplierDetail.name}`}
+      className="w-full h-full object-contain p-1 bg-white"
+    />
+  ) : (
+    <Building2 className="w-5 h-5 text-blue-700" />
+  )}
+</div>
 
           <div>
             <h3 className="font-semibold text-gray-900">
@@ -1980,6 +2039,46 @@ setUploadProgress(30);
               placeholder="Adresse complète"
             />
           </div>
+         <div className="mt-4">
+  <label className="block text-xs font-medium text-gray-700 mb-1">
+    Logo du fournisseur
+  </label>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) =>
+      setSupplierForm({
+        ...supplierForm,
+        logo: e.target.files?.[0] || null,
+      })
+    }
+    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+  />
+
+  <p className="mt-1 text-xs text-gray-500">
+    Facultatif — formats image uniquement.
+  </p>
+
+  {editingSupplierId &&
+    suppliers.find((supplier) => supplier.id === editingSupplierId)?.logo && (
+      <div className="mt-3">
+        <p className="text-sm text-gray-600 mb-2">
+          Logo actuel
+        </p>
+
+        <img
+          src={
+            suppliers.find(
+              (supplier) => supplier.id === editingSupplierId
+            )?.logo || ""
+          }
+          alt="Logo du fournisseur"
+          className="h-20 w-20 object-contain border border-gray-200 rounded-lg p-1"
+        />
+      </div>
+    )}
+</div>
         </div>
 
         {/* Contact principal */}
