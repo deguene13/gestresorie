@@ -36,10 +36,27 @@ import {
   Users2,
 } from "lucide-react";
 import { DiperfloLogo } from "../shared/DiperfloLogo";
+import { apiRequest } from "../../apiClient";
 
 type NavChild = { icon: any; label: string; path: string };
 type NavGroup = { icon: any; label: string; key: string; children: NavChild[] };
 type NavItem = { icon: any; label: string; path: string };
+
+type CompanyBranding = {
+  userId: string;
+  companyId: string | null;
+  name: string;
+  logo: string | null;
+};
+
+function resolveCompanyLogoUrl(logo: string) {
+  try {
+    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+    return new URL(logo, apiUrl || window.location.origin).toString();
+  } catch {
+    return logo;
+  }
+}
 
 const achatChildren: NavChild[] = [
   { icon: ShoppingCart, label: "Bons de commande", path: "/app/purchase-orders" },
@@ -179,7 +196,66 @@ export function MainLayout() {
 } = useAppData();
   const auth = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
+  const [companyBranding, setCompanyBranding] = useState<CompanyBranding | null>(null);
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
   const handleLogout = () => { auth.logout(); navigate("/login"); };
+
+  useEffect(() => {
+    let active = true;
+    const userId = auth.user?.id;
+
+    if (!userId) {
+      setCompanyBranding(null);
+      setFailedLogoUrl(null);
+      return () => { active = false; };
+    }
+
+    setCompanyBranding(null);
+    setFailedLogoUrl(null);
+
+    const loadCompanyBranding = async () => {
+      try {
+        const profile = await apiRequest("/v1/users/me/");
+        const linkedCompany = profile?.company ?? null;
+
+        if (!linkedCompany?.id) {
+          if (active) {
+            setCompanyBranding({ userId, companyId: null, name: linkedCompany?.name ?? "", logo: null });
+          }
+          return;
+        }
+
+        let company = linkedCompany;
+        try {
+          company = await apiRequest(`/v1/companies/${encodeURIComponent(linkedCompany.id)}/`);
+        } catch {
+          // Keep the company data from the authenticated profile when detail lookup is unavailable.
+        }
+
+        if (active) {
+          setCompanyBranding({
+            userId,
+            companyId: linkedCompany.id,
+            name: company?.name ?? linkedCompany.name ?? "",
+            logo: company?.logo ?? linkedCompany.logo ?? null,
+          });
+        }
+      } catch (error) {
+        console.error("Erreur chargement du logo de l'entreprise connectée :", error);
+        if (active) {
+          setCompanyBranding({
+            userId,
+            companyId: null,
+            name: auth.user?.company?.name ?? "",
+            logo: null,
+          });
+        }
+      }
+    };
+
+    loadCompanyBranding();
+    return () => { active = false; };
+  }, [auth.user?.id, auth.user?.company?.id]);
 
   // Route guard: redirect after auth is initialized
   useEffect(() => {
@@ -195,6 +271,14 @@ export function MainLayout() {
 
   // Permission helper — always false when not initialized or not logged in
   const can = (perm: string) => auth.hasPermission(perm);
+  const currentCompanyId = auth.user?.company?.id ?? null;
+  const visibleCompanyBranding = companyBranding && companyBranding.userId === auth.user?.id &&
+    (!currentCompanyId || companyBranding?.companyId === currentCompanyId)
+    ? companyBranding
+    : null;
+  const companyLogoUrl = visibleCompanyBranding?.logo
+    ? resolveCompanyLogoUrl(visibleCompanyBranding.logo)
+    : null;
 
   const achatChildrenI18n = [
     { icon: ShoppingCart,    label: t.nav.purchaseOrders[lang],    path: "/app/purchase-orders",      perm: "purchase_orders:view" },
@@ -379,6 +463,27 @@ export function MainLayout() {
           <div className="flex-1 lg:flex-none" />
 
           <div className="flex items-center gap-3">
+            <div
+              className="flex min-w-0 items-center gap-2"
+              title={visibleCompanyBranding?.name || "Entreprise"}
+            >
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                {companyLogoUrl && failedLogoUrl !== companyLogoUrl ? (
+                  <img
+                    src={companyLogoUrl}
+                    alt={visibleCompanyBranding?.name ? `Logo ${visibleCompanyBranding.name}` : "Logo entreprise"}
+                    className="h-full w-full object-contain"
+                    onError={() => setFailedLogoUrl(companyLogoUrl)}
+                  />
+                ) : (
+                  <Building2 className="h-4 w-4 text-gray-400" />
+                )}
+              </div>
+              <span className="hidden max-w-32 truncate text-sm font-medium text-gray-700 md:block">
+                {visibleCompanyBranding?.name || "Entreprise"}
+              </span>
+            </div>
+
             {/* Language toggle */}
             <button
               onClick={() => setLang(lang === "fr" ? "en" : "fr")}

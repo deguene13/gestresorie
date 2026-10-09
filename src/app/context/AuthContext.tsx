@@ -208,6 +208,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
 type DjangoCompany = {
   id: string;
   name: string;
+  logo?: string | null;
   legal_form: string;
   ninea: string;
   rccm: string;
