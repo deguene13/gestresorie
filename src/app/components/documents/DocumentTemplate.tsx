@@ -18,12 +18,23 @@ export type DocumentData = {
   companyPhone: string;
   companyEmail: string;
   companyLogo?: string | null;
+  headerName?: string;
+  headerAddress?: string;
+  headerPhone?: string;
+  headerEmail?: string;
+  headerLogo?: string | null;
 
   // Informations du client
   clientName: string;
   clientAddress: string;
   clientPhone: string;
   clientLogo?: string | null;
+  recipientLabel?: string;
+  recipientName?: string;
+  recipientAddress?: string;
+  recipientPhone?: string;
+  recipientEmail?: string;
+  recipientLogo?: string | null;
 
   items: DocumentItem[];
   subtotal: number;
@@ -32,6 +43,8 @@ export type DocumentData = {
   total: number;
   isPaid?: boolean;
   notes?: string;
+  signatureImage?: string | null;
+  signedBy?: string;
 };
 type Props = {
   data: DocumentData;
@@ -39,21 +52,36 @@ type Props = {
   onPrint: () => void;
   onBack?: () => void;
   showActions?: boolean;
+  contentId?: string;
 };
 
-export function DocumentTemplate({ data, onDownload, onPrint, onBack, showActions = true }: Props) {
+export function DocumentTemplate({ data, onDownload, onPrint, onBack, showActions = true, contentId = "document-content" }: Props) {
+  const headerName = data.headerName ?? data.companyName;
+  const headerAddress = data.headerAddress ?? data.companyAddress;
+  const headerPhone = data.headerPhone ?? data.companyPhone;
+  const headerEmail = data.headerEmail ?? data.companyEmail;
+  const headerLogo: string | undefined = data.headerLogo !== undefined
+    ? data.headerLogo ?? undefined
+    : data.companyLogo ?? data.clientLogo ?? undefined;
+  const recipientName = data.recipientName ?? data.clientName;
+  const recipientAddress = data.recipientAddress ?? data.clientAddress;
+  const recipientPhone = data.recipientPhone ?? data.clientPhone;
+  const recipientEmail = data.recipientEmail;
+  const recipientLogo = data.recipientLogo ?? undefined;
+
   return (
     <div className="space-y-6">
      
 
       {/* Document A4 */}
       <div
-        id="document-content"
+        id={contentId}
         className="bg-white shadow-lg mx-auto"
         style={{
           width: "210mm",
           minHeight: "297mm",
           padding: "20mm",
+          boxSizing: "border-box",
           fontFamily: "Arial, sans-serif",
         }}
       >
@@ -62,32 +90,19 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
           {/* Company Info */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-             {data.companyLogo || data.clientLogo ? (
-  <img
-    src={data.companyLogo || data.clientLogo || ""}
-    alt={`Logo ${data.companyName || data.clientName}`}
-    className="w-16 h-16 object-contain border border-gray-200 rounded-lg p-1 bg-white"
-  />
-) : (
-  <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-    <svg
-      className="w-10 h-10 text-white"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 0 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
-  </div>
-)}
+              {headerLogo ? (
+                <img
+                  src={headerLogo}
+                  alt={`Logo ${headerName}`}
+                  className="h-16 w-16 flex-shrink-0 object-contain"
+                  onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
+                />
+              ) : (
+                <div className="h-16 w-16 flex-shrink-0" aria-hidden="true" />
+              )}
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
-                    {data.companyName}
+                    {headerName}
                 </h1>
 
                <p className="text-sm font-semibold" style={{ color: "#0F3D91" }}>
@@ -96,9 +111,9 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
               </div>
             </div>
             <div className="text-sm text-gray-700 space-y-1">
-              <p>{data.companyAddress}</p>
-              <p>Tél: {data.companyPhone}</p>
-              <p>Email: {data.companyEmail}</p>
+              {headerAddress && <p>{headerAddress}</p>}
+              {headerPhone && <p>Tél: {headerPhone}</p>}
+              {headerEmail && <p>Email: {headerEmail}</p>}
             </div>
           </div>
 
@@ -133,23 +148,24 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
         {/* Client Info */}
         <div className="mb-8 p-4 bg-gray-50 rounded">
           <h3 className="font-semibold text-gray-900 mb-2">
-            {data.type === "Devis"
+            {data.recipientLabel ?? (data.type === "Devis"
                ? "Destinataire"
              : data.type === "Facture"
                ? "Facturé à"
                : data.type === "Bordereau de livraison"
                  ? "Fournisseur"
-               : "Client"}
+               : "Client")}
             </h3>
          <div className="text-sm text-gray-700 space-y-1">
-  <p className="font-semibold">{data.clientName}</p>
+  <p className="font-semibold">{recipientName}</p>
 
-  {data.clientAddress && <p>{data.clientAddress}</p>}
+  {recipientAddress && <p>{recipientAddress}</p>}
 
-  {data.clientPhone && <p>Tél : {data.clientPhone}</p>}
+  {recipientPhone && <p>Tél : {recipientPhone}</p>}
 
-  {data.companyEmail && <p>Email : {data.companyEmail}</p>}
+  {recipientEmail && <p>Email : {recipientEmail}</p>}
 </div>
+          {recipientLogo && <img src={recipientLogo} alt={`Logo ${recipientName}`} className="mt-3 h-12 w-12 object-contain" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} />}
         </div>
 
         {/* Items Table */}
@@ -217,10 +233,14 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
               <p className="mt-1">En cas de question, contactez-nous</p>
             </div>
             <div className="text-center">
-              <div className="border-2 border-dashed border-gray-300 w-40 h-24 flex items-center justify-center mb-2">
-                <span className="text-gray-400 text-sm">Signature et cachet</span>
-              </div>
-              <p className="text-xs text-gray-600">Signature autorisée</p>
+              {data.signatureImage ? (
+                <img src={data.signatureImage ?? undefined} alt="Signature et cachet" className="mx-auto mb-2 h-24 w-40 object-contain" />
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 w-40 h-24 flex items-center justify-center mb-2">
+                  <span className="text-gray-400 text-sm">Signature et cachet</span>
+                </div>
+              )}
+              <p className="text-xs text-gray-600">{data.signedBy || "Signature autorisée"}</p>
             </div>
           </div>
         </div>

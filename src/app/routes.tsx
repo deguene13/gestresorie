@@ -18,7 +18,7 @@ import { OtherCollections } from "./components/pages/OtherCollections";
 import { OtherDisbursements } from "./components/pages/OtherDisbursements";
 import { UserSettings } from "./components/pages/UserSettings";
 import { Products } from "./components/pages/Products";
-import { DocumentGenerator } from "./components/pages/DocumentGenerator";
+import { AccountingBundles } from "./components/pages/AccountingBundles";
 import { Quotes } from "./components/pages/Quotes";
 import { DailyTreasury } from "./components/pages/DailyTreasury";
 import { TreasuryAccounts } from "./components/pages/TreasuryAccounts";
@@ -65,7 +65,7 @@ export const router = createBrowserRouter([
       { path: "users", element: <UserManagement /> },
       { path: "collections", element: <OtherCollections /> },
       { path: "disbursements", element: <OtherDisbursements /> },
-      { path: "documents", element: <DocumentGenerator /> },
+      { path: "documents", element: <AccountingBundles /> },
       { path: "daily-treasury", element: <DailyTreasury /> },
       { path: "treasury-accounts", element: <TreasuryAccounts /> },
       { path: "global-treasury", element: <GlobalTreasury /> },
