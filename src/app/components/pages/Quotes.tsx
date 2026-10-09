@@ -1025,18 +1025,37 @@ console.log(
   }
 };
 
-  // ── Document preview ──────────────────────────────────────────────────────
-  const getDocData = (q: Quote) => ({
-    type: "Devis" as const,
-    number: q.id,
-    date: q.createdDate,
-    clientName: q.clientName,
-    clientAddress: q.clientAddress || q.clientEmail,
-    clientPhone: q.clientPhone,
-    items: q.items.map((i) => ({ designation: i.productName, quantity: i.quantity, unitPrice: i.unitPrice, total: i.total })),
-    subtotal: q.subtotal, tvaRate: q.tvaRate, tvaAmount: q.tvaAmount, total: q.total,
-    notes: q.description || undefined,
-  });
+
+// ── Document preview ──────────────────────────────────────────────────────
+const getDocData = (q: Quote) => ({
+  type: "Devis" as const,
+  number: q.id,
+  date: q.createdDate,
+
+  // Informations de l'entreprise
+  companyName: "",
+  companyAddress: "",
+  companyPhone: "",
+  companyEmail: "",
+
+  // Informations du client
+  clientName: q.clientName,
+  clientAddress: q.clientAddress || q.clientEmail,
+  clientPhone: q.clientPhone,
+
+  items: q.items.map((i) => ({
+    designation: i.productName,
+    quantity: i.quantity,
+    unitPrice: i.unitPrice,
+    total: i.total,
+  })),
+
+  subtotal: q.subtotal,
+  tvaRate: q.tvaRate,
+  tvaAmount: q.tvaAmount,
+  total: q.total,
+  notes: q.description || undefined,
+});
 
   const handleDownloadPDF = () => {
     const el = document.getElementById("document-content");
