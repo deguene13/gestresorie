@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Plus, Edit, Trash2, X } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { apiRequest } from "../../apiClient";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 import {
   type Product,
   getProducts,
@@ -362,23 +363,10 @@ const handleEdit = (product: ProductUI) => {
                        : "—"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="Modifier"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="w-4 h
-                        -4" />
-                      </button>
-                    </div>
+                    <RowActionMenu>
+                      <RowActionItem icon={<Edit />} onSelect={() => handleEdit(product)}>Modifier</RowActionItem>
+                      <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(product.id)} destructive>Supprimer</RowActionItem>
+                    </RowActionMenu>
                   </td>
                 </tr>
               ))}

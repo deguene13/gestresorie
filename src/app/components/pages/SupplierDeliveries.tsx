@@ -5,6 +5,7 @@ import { useAppData } from "../../context/AppDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../apiClient";
 import { RejectModal } from "../shared/RejectModal";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 type DeliveryItem = {
   id: string;
@@ -1153,64 +1154,13 @@ console.log(
                       {new Date(delivery.deliveryDate).toLocaleDateString("fr-FR")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex gap-2">
-                        <button
-                         onClick={() => {
-                          console.log("=== LIVRAISON SÉLECTIONNÉE ===", delivery);
-                           console.log("=== MOTIF REJET ===", delivery.rejectionReason);
-                           console.log(
-                           "=== STATUT LIVRAISON SÉLECTIONNÉE ===",
-                           selectedDelivery?.status
-                        );
-
-                          setSelectedDelivery(deliveries.find((d) => d.id === delivery.id) || delivery);
-                          setShowDetailModal(true);
-                        }}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          title="Voir détails"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {canCreate && delivery.status !== "complete" && (
-                       <button
-                          onClick={() => handleEdit(delivery)}
-                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition"
-                         title="Modifier"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      )}
-
-                       {canValidate && delivery.status === "partial" && (
-                          <button
-                           onClick={() => handleValidate(delivery)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                            title="Marquer comme complet"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                        {canValidate &&
-                           delivery.status !== "complete" &&
-                           delivery.status !== "rejected" && (
-                          <button
-                            onClick={() => handleReject(delivery.id, delivery.reference)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Rejeter"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            onClick={() => handleDelete(delivery.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                      <RowActionMenu>
+                        <RowActionItem icon={<Eye />} onSelect={() => { setSelectedDelivery(deliveries.find((d) => d.id === delivery.id) || delivery); setShowDetailModal(true); }}>Voir détails</RowActionItem>
+                        {canCreate && delivery.status !== "complete" && <RowActionItem icon={<Pencil />} onSelect={() => handleEdit(delivery)}>Modifier</RowActionItem>}
+                        {canValidate && delivery.status === "partial" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleValidate(delivery)}>Marquer comme complet</RowActionItem>}
+                        {canValidate && delivery.status !== "complete" && delivery.status !== "rejected" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(delivery.id, delivery.reference)} destructive>Rejeter</RowActionItem>}
+                        {canDelete && <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(delivery.id)} destructive>Supprimer</RowActionItem>}
+                      </RowActionMenu>
                     </td>
                   </tr>
                 );

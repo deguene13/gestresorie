@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { apiRequest } from "../../apiClient";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 interface ProductDetail {
   id: string;
@@ -1089,43 +1090,16 @@ const [totalPages, setTotalPages] = useState(1);
                         </td>
 
                         <td className="px-6 py-4 whitespace-nowrap">
-
-                          <div className="flex gap-2">
-
-                            <button
-                              onClick={() =>
-                                handleViewDetails(
-                                  delivery
-                                )
-                              }
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                              title="Voir détails"
+                          <RowActionMenu>
+                            <RowActionItem icon={<Eye />} onSelect={() => handleViewDetails(delivery)}>Voir détails</RowActionItem>
+                            <RowActionItem
+                              icon={deletingId === delivery.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                              onSelect={() => handleDelete(delivery)}
+                              destructive
                             >
-                              <Eye className="w-4 h-4" />
-                            </button>
-
-                            <button
-                              onClick={() =>
-                                handleDelete(
-                                  delivery
-                                )
-                              }
-                              disabled={
-                                deletingId ===
-                                delivery.id
-                              }
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
-                              title="Supprimer"
-                            >
-                              {deletingId ===
-                              delivery.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-
-                          </div>
+                              Supprimer
+                            </RowActionItem>
+                          </RowActionMenu>
 
                         </td>
 

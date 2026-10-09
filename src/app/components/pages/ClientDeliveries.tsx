@@ -24,6 +24,7 @@ import {
   validateCustomerDelivery,
 } from "../../data/customerDeliveriesData";
 import { getCustomerOrders } from "../../data/customerOrdersData";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 type ClientDeliveryItem = {
   productName: string;
@@ -716,71 +717,12 @@ export function ClientDeliveries() {
                       </td>
 
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex gap-2">
-                          {/* Voir */}
-                          <button
-                            onClick={() => {
-                              setSelectedDelivery(
-                                delivery
-                              );
-                              setShowDetailModal(true);
-                            }}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            title="Voir détails"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          {/* Valider */}
-                         {canValidate &&
-                            delivery.status !== "VALIDATED" &&
-                             delivery.status !== "REJECTED" && (
-                              <button
-                                onClick={() =>
-                                  handleValidate(
-                                    delivery
-                                  )
-                                }
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                                title="Valider le bon de livraison"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                            )}
-
-                          {/* Rejeter */}
-                          {canValidate &&
-                             delivery.status !== "VALIDATED" &&
-                             delivery.status !== "REJECTED" && (
-                              <button
-                                onClick={() =>
-                                  handleReject(
-                                    delivery.id,
-                                    delivery.reference
-                                  )
-                                }
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                                title="Rejeter"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            )}
-
-                          {/* Supprimer */}
-                          {canDelete && (
-                            <button
-                              onClick={() =>
-                                handleDelete(
-                                  delivery.id
-                                )
-                              }
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                              title="Supprimer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+                        <RowActionMenu>
+                          <RowActionItem icon={<Eye />} onSelect={() => { setSelectedDelivery(delivery); setShowDetailModal(true); }}>Voir détails</RowActionItem>
+                          {canValidate && delivery.status !== "VALIDATED" && delivery.status !== "REJECTED" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleValidate(delivery)}>Valider le bon de livraison</RowActionItem>}
+                          {canValidate && delivery.status !== "VALIDATED" && delivery.status !== "REJECTED" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(delivery.id, delivery.reference)} destructive>Rejeter</RowActionItem>}
+                          {canDelete && <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(delivery.id)} destructive>Supprimer</RowActionItem>}
+                        </RowActionMenu>
                       </td>
                     </tr>
                   );

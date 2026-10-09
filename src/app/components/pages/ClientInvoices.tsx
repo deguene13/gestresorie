@@ -13,6 +13,7 @@ import {
   deleteCustomerInvoice,
 } from "../../data/customerInvoicesApi";
 import { getCustomerDeliveries } from "../../data/customerDeliveriesData";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 // ---------- types ----------
 type Invoice = {
   id: string;
@@ -854,83 +855,26 @@ return (
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleViewDetails(invoice)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          title="Voir détails"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                           {canEdit && invoice.status === "DRAFT" && (
-  <button
-    onClick={() => {
-     const djangoInvoice = djangoInvoices.find(
-  (inv: any) => inv.reference === invoice.id
-);
-
-if (!djangoInvoice) {
-  console.error("Facture Django introuvable :", invoice.id);
-  return;
-}
-
-setEditingInvoiceId(djangoInvoice.id);
-      setFormData({
-        client: invoice.client,
-        bdcRef: invoice.bdcRef,
-        blRef: invoice.blRef,
-        deliveryId: "",
-        issueDate: invoice.issueDate,
-        dueDate: invoice.dueDate,
-        tvaRate: invoice.tvaRate,
-      });
-
-      setFormItems(
-  (invoice.items ?? []).map((item: any, index: number) => ({
-    id: index + 1,
-    designation: item.designation ?? "",
-    quantity: Number(item.quantity ?? 0),
-    unitPrice: Number(item.unitPrice ?? 0),
-  }))
-);
-      setFormLocked(false);
-      setShowModal(true);
-    }}
-    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-    title="Modifier"
-  >
-    <Edit className="w-4 h-4" />
-  </button>
-)}
-
-                       {canSend && invoice.status === "DRAFT" && (
-                          <button
-                            onClick={() => handleSendInvoice(invoice.id)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                            title="Envoyer au client"
-                          >
-                            <Send className="w-4 h-4" />
-                          </button>
+                      <RowActionMenu>
+                        <RowActionItem icon={<Eye />} onSelect={() => handleViewDetails(invoice)}>Voir détails</RowActionItem>
+                        {canEdit && invoice.status === "DRAFT" && (
+                          <RowActionItem icon={<Edit />} onSelect={() => {
+                            const djangoInvoice = djangoInvoices.find((inv: any) => inv.reference === invoice.id);
+                            if (!djangoInvoice) {
+                              console.error("Facture Django introuvable :", invoice.id);
+                              return;
+                            }
+                            setEditingInvoiceId(djangoInvoice.id);
+                            setFormData({ client: invoice.client, bdcRef: invoice.bdcRef, blRef: invoice.blRef, deliveryId: "", issueDate: invoice.issueDate, dueDate: invoice.dueDate, tvaRate: invoice.tvaRate });
+                            setFormItems((invoice.items ?? []).map((item: any, index: number) => ({ id: index + 1, designation: item.designation ?? "", quantity: Number(item.quantity ?? 0), unitPrice: Number(item.unitPrice ?? 0) })));
+                            setFormLocked(false);
+                            setShowModal(true);
+                          }}>Modifier</RowActionItem>
                         )}
-                        {canMarkPaid && !invoice.isPaid && (invoice.status === "sent" || invoice.status === "unpaid") && (
-                          <button
-                            onClick={() => setPayModal({ invoiceId: invoice.id, method: PAYMENT_METHODS[0] })}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                            title="Marquer comme payée"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            onClick={() => handleDelete(invoice.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                        {canSend && invoice.status === "DRAFT" && <RowActionItem icon={<Send />} onSelect={() => handleSendInvoice(invoice.id)}>Envoyer au client</RowActionItem>}
+                        {canMarkPaid && !invoice.isPaid && (invoice.status === "sent" || invoice.status === "unpaid") && <RowActionItem icon={<CheckCircle />} onSelect={() => setPayModal({ invoiceId: invoice.id, method: PAYMENT_METHODS[0] })}>Marquer comme payée</RowActionItem>}
+                        {canDelete && <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(invoice.id)} destructive>Supprimer</RowActionItem>}
+                      </RowActionMenu>
                     </td>
                   </tr>
                 );

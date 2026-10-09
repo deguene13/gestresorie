@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { DocumentTemplate } from "../documents/DocumentTemplate";
 import { RejectModal } from "../shared/RejectModal";
 import { apiRequest } from "../../apiClient";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 // ---------- types ----------
 type InvoiceStatus =
@@ -1481,64 +1482,21 @@ const handleApproveDaf = async (invoiceId: string) => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-2">
-  <button
-    onClick={() => handleViewDocument(invoice)}
-    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-    title="Aperçu document"
-  >
-    <FileText className="w-4 h-4" />
-  </button>
-
-  {canValidateStep1 && invoice.status === "PENDING_ACCOUNTANT" && (
-    <button
-      onClick={() => handleValidate(invoice.id)}
-      className="p-2 text-cyan-600 hover:bg-cyan-50 rounded-lg transition"
-      title="Valider (Comptable)"
-    >
-      <UserCheck className="w-4 h-4" />
-    </button>
-  )}
-
-  {canValidateStep2 && invoice.status === "PENDING_DAF" && (
-    <button
-      onClick={() => handleApproveDaf(invoice.id)}
-      className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-      title="Approuver (DAF)"
-    >
-      <CheckCircle className="w-4 h-4" />
-    </button>
-  )}
-
-  {canValidateStep3 && invoice.status === "PENDING_DG" && (
-    <button
-      onClick={() => handleApprove(invoice.id)}
-      className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-      title="Approuver (DG)"
-    >
-      <CheckCircle className="w-4 h-4" />
-    </button>
-  )}
-
- {canReject &&
-  invoice.status !== "APPROVED" &&
-  invoice.status !== "PAID" &&
-  invoice.status !== "CANCELLED" &&
-  invoice.status !== "REJECTED" && (
-      <button
-        onClick={() =>
-          setRejectModal({
-            invoiceId: invoice.id,
-            ref: invoice.reference,
-          })
-        }
-        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-        title="Rejeter"
-      >
-        <XCircle className="w-4 h-4" />
-      </button>
-    )}
-</div>
+                    <RowActionMenu>
+                      <RowActionItem icon={<FileText />} onSelect={() => handleViewDocument(invoice)}>Aperçu document</RowActionItem>
+                      {canValidateStep1 && invoice.status === "PENDING_ACCOUNTANT" && <RowActionItem icon={<UserCheck />} onSelect={() => handleValidate(invoice.id)}>Valider (Comptable)</RowActionItem>}
+                      {canValidateStep2 && invoice.status === "PENDING_DAF" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApproveDaf(invoice.id)}>Approuver (DAF)</RowActionItem>}
+                      {canValidateStep3 && invoice.status === "PENDING_DG" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApprove(invoice.id)}>Approuver (DG)</RowActionItem>}
+                      {canReject && invoice.status !== "APPROVED" && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && invoice.status !== "REJECTED" && (
+                        <RowActionItem
+                          icon={<XCircle />}
+                          onSelect={() => setRejectModal({ invoiceId: invoice.id, ref: invoice.reference })}
+                          destructive
+                        >
+                          Rejeter
+                        </RowActionItem>
+                      )}
+                    </RowActionMenu>
                   </td>
                 </tr>
               ))}

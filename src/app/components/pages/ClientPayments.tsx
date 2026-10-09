@@ -13,6 +13,7 @@ import {
   XCircle,
   ArrowRight,
   Zap,
+  Edit2,
 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import {
@@ -25,6 +26,7 @@ import {
   completeCustomerPayment,
 } from "../../data/customerPaymentsApi";
 import { getCustomerInvoices } from "../../data/customerInvoicesApi";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 type MoyenPaiement =
   | "cheque"
@@ -632,157 +634,17 @@ setShowModal(false);
                         {p.dueDate}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {p.status === "created" && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  advanceStatus(p.id, "pending_validation")
-                                }
-                                title="Soumettre"
-                                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-                              >
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  try {
-                                  await deleteCustomerPayment(p.paymentId);
-                                 setPayments((prev) =>
-                                 prev.filter((payment) => payment.id !== p.id)
-                                );
-                                } catch (error) {
-                                console.error("Erreur suppression paiement client :", error);
-                                 }
-                                }}
-                                title="Supprimer"
-                                className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                          {p.status === "pending_validation" && (
-                            <>
-                            <button
-  onClick={() => {
-    setEditingPayment(p);
-
-    setFormData((f) => ({
-      ...f,
-      invoiceRef: p.invoiceRef,
-      invoiceId: p.invoiceId,
-      client: p.client,
-      invoiceAmount: String(p.invoiceAmount),
-      paidAmount: String(p.paidAmount),
-      moyenPaiement: p.moyenPaiement,
-      referenceNumber: p.referenceNumber,
-      paymentDate: p.date,
-      notes: p.notes,
-    }));
-
-    setShowModal(true);
-  }}
-  title="Modifier"
-  aria-label="Modifier"
-  className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
->
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="w-3.5 h-3.5"
-  >
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-  </svg>
-</button>
-                              <button
-                               onClick={async () => {
-                                  try {
-                                  await validateCustomerPayment(p.paymentId);
-                                      advanceStatus(p.id, "validated");
-                                   } catch (error) {
-                                  console.error("Erreur validation paiement client :", error);
-                                 }
-                                }}
-                                title="Valider"
-                                className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => advanceStatus(p.id, "rejected")}
-                                title="Rejeter"
-                                className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition"
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-  onClick={async () => {
-    try {
-      await deleteCustomerPayment(p.paymentId);
-      setPayments((prev) =>
-        prev.filter((payment) => payment.id !== p.id)
-      );
-    } catch (error) {
-      console.error("Erreur suppression paiement client :", error);
-    }
-  }}
-  title="Supprimer"
-  className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition"
->
-  <Trash2 className="w-3.5 h-3.5" />
-</button>
-                            </>
-                          )}
-                          {p.status === "validated" && (
-                            <button
-                              onClick={async () => {
-                                 try {
-                                await executeCustomerPayment(p.paymentId);
-                                 advanceStatus(p.id, "executed");
-                               } catch (error) {
-                                console.error("Erreur exécution paiement client :", error);
-                              }
-                           }}
-                              title="Exécuter"
-                              className="p-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition"
-                            >
-                              <Zap className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {p.status === "executed" && (
-                            <button
-                              onClick={async () => {
-                             try {
-                                 await completeCustomerPayment(p.paymentId);
-                                  advanceStatus(p.id, "completed");
-                               } catch (error) {
-                               console.error("Erreur finalisation paiement client :", error);
-                              }
-                             }}
-                              title="Terminer"
-                              className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              setSelectedPayment(p);
-                              setShowDetailModal(true);
-                            }}
-                            title="Voir détails"
-                            className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        <RowActionMenu>
+                          {p.status === "created" && <RowActionItem icon={<ArrowRight />} onSelect={() => advanceStatus(p.id, "pending_validation")}>Soumettre</RowActionItem>}
+                          {p.status === "created" && <RowActionItem icon={<Trash2 />} onSelect={async () => { try { await deleteCustomerPayment(p.paymentId); setPayments((prev) => prev.filter((payment) => payment.id !== p.id)); } catch (error) { console.error("Erreur suppression paiement client :", error); } }} destructive>Supprimer</RowActionItem>}
+                          {p.status === "pending_validation" && <RowActionItem icon={<Edit2 />} onSelect={() => { setEditingPayment(p); setFormData((f) => ({ ...f, invoiceRef: p.invoiceRef, invoiceId: p.invoiceId, client: p.client, invoiceAmount: String(p.invoiceAmount), paidAmount: String(p.paidAmount), moyenPaiement: p.moyenPaiement, referenceNumber: p.referenceNumber, paymentDate: p.date, notes: p.notes })); setShowModal(true); }}>Modifier</RowActionItem>}
+                          {p.status === "pending_validation" && <RowActionItem icon={<CheckCircle />} onSelect={async () => { try { await validateCustomerPayment(p.paymentId); advanceStatus(p.id, "validated"); } catch (error) { console.error("Erreur validation paiement client :", error); } }}>Valider</RowActionItem>}
+                          {p.status === "pending_validation" && <RowActionItem icon={<XCircle />} onSelect={() => advanceStatus(p.id, "rejected")} destructive>Rejeter</RowActionItem>}
+                          {p.status === "pending_validation" && <RowActionItem icon={<Trash2 />} onSelect={async () => { try { await deleteCustomerPayment(p.paymentId); setPayments((prev) => prev.filter((payment) => payment.id !== p.id)); } catch (error) { console.error("Erreur suppression paiement client :", error); } }} destructive>Supprimer</RowActionItem>}
+                          {p.status === "validated" && <RowActionItem icon={<Zap />} onSelect={async () => { try { await executeCustomerPayment(p.paymentId); advanceStatus(p.id, "executed"); } catch (error) { console.error("Erreur exécution paiement client :", error); } }}>Exécuter</RowActionItem>}
+                          {p.status === "executed" && <RowActionItem icon={<CheckCircle />} onSelect={async () => { try { await completeCustomerPayment(p.paymentId); advanceStatus(p.id, "completed"); } catch (error) { console.error("Erreur finalisation paiement client :", error); } }}>Terminer</RowActionItem>}
+                          <RowActionItem icon={<Eye />} onSelect={() => { setSelectedPayment(p); setShowDetailModal(true); }}>Voir détails</RowActionItem>
+                        </RowActionMenu>
                       </td>
                     </tr>
                   );

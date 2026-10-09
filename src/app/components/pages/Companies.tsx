@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Building2 } from "lucide-react";
+import { Building2, Edit, Eye, Trash2 } from "lucide-react";
 import { apiRequest } from "../../apiClient";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 interface Company {
   id: string;
@@ -574,46 +575,31 @@ const handleDeleteCompany = async (company: Company) => {
                   </span>
                 </td>
                <td className="px-4 py-3">
-  <div className="flex items-center gap-2">
-    <button
-      type="button"
-      onClick={() => {
-        setEditingCompany(company);
-        setFormData({
-          name: company.name,
-          legal_form: company.legal_form,
-          ninea: company.ninea,
-          rccm: company.rccm,
-          email: company.email,
-          phone: company.phone,
-          address: company.address,
-          logo: null,
-        });
-        setShowForm(true);
-      }}
-      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-    >
-      
-      Modifier
-    </button>
-    <button
-  type="button"
-  onClick={() => handleViewCompany(company)}
-  className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
->
-  Voir
-</button>
-
-    {company.is_active && (
-      <button
-        type="button"
-        onClick={() => handleDeleteCompany(company)}
-        className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
-      >
-        Désactiver
-      </button>
-    )}
-  </div>
+                <RowActionMenu>
+                  <RowActionItem
+                    icon={<Edit />}
+                    onSelect={() => {
+                      setEditingCompany(company);
+                      setFormData({
+                        name: company.name,
+                        legal_form: company.legal_form,
+                        ninea: company.ninea,
+                        rccm: company.rccm,
+                        email: company.email,
+                        phone: company.phone,
+                        address: company.address,
+                        logo: null,
+                      });
+                      setShowForm(true);
+                    }}
+                  >
+                    Modifier
+                  </RowActionItem>
+                  <RowActionItem icon={<Eye />} onSelect={() => handleViewCompany(company)}>Voir</RowActionItem>
+                  {company.is_active && (
+                    <RowActionItem icon={<Trash2 />} onSelect={() => handleDeleteCompany(company)} destructive>Désactiver</RowActionItem>
+                  )}
+                </RowActionMenu>
 </td>
               </tr>
             ))}

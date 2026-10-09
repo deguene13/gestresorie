@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Plus, Eye, TrendingUp, Trash2, Pencil, X, CheckCircle, XCircle } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 import {
   createOtherReceipt,
    updateTreasuryManualEntry,
@@ -583,64 +584,14 @@ if (isEditing && selectedCollection?.id) {
                     {new Date(collection.date).toLocaleDateString("fr-FR")}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleViewDetails(collection)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="Voir détails"
-                      >
-                      <Eye className="w-4 h-4" />
-</button>
-{canManage && collection.status === "draft" && (
-  <button
-    onClick={() => handleEdit(collection)}
-    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-    title="Modifier"
-  >
-    <Pencil className="w-4 h-4" />
-  </button>
-)}
-
-{(canManage || canValidateDG) && collection.status === "draft" && (
-  <button
-    onClick={() => handleApprove(collection.id)}
-    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-    title="Approuver"
-  >
-    <CheckCircle className="w-4 h-4" />
-  </button>
-)}
-
-{canManage && collection.status === "approved" && (
-  <button
-    onClick={() => handleIntegrate(collection.id)}
-    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-    title="Intégrer"
-  >
-    <CheckCircle className="w-4 h-4" />
-  </button>
-)}
-
-{(canManage || canValidateDG) &&
-  (collection.status === "draft" || collection.status === "pending") && (
-    <button
-      onClick={() => handleReject(collection.id)}
-      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-      title="Rejeter"
-    >
-      <XCircle className="w-4 h-4" />
-    </button>
-  )}
-                      {canDelete && (
-                        <button
-                          onClick={() => handleDelete(collection.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    <RowActionMenu>
+                      <RowActionItem icon={<Eye />} onSelect={() => handleViewDetails(collection)}>Voir détails</RowActionItem>
+                      {canManage && collection.status === "draft" && <RowActionItem icon={<Pencil />} onSelect={() => handleEdit(collection)}>Modifier</RowActionItem>}
+                      {(canManage || canValidateDG) && collection.status === "draft" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApprove(collection.id)}>Approuver</RowActionItem>}
+                      {canManage && collection.status === "approved" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleIntegrate(collection.id)}>Intégrer</RowActionItem>}
+                      {(canManage || canValidateDG) && (collection.status === "draft" || collection.status === "pending") && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(collection.id)} destructive>Rejeter</RowActionItem>}
+                      {canDelete && <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(collection.id)} destructive>Supprimer</RowActionItem>}
+                    </RowActionMenu>
                   </td>
                 </tr>
               ))}

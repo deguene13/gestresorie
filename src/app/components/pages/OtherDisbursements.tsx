@@ -3,6 +3,7 @@ import { Search, Plus, Eye, TrendingDown, FileText, Trash2, X, CheckCircle, XCir
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../apiClient";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 import {
   createOtherReceipt,
   getTreasuryTransactions,
@@ -702,64 +703,14 @@ const handlePay = async (disbursementId: string) => {
                     {new Date(disbursement.date).toLocaleDateString("fr-FR")}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleViewDetails(disbursement)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="Voir détails"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {canCreate && disbursement.status !== "approved" && disbursement.status !== "paid" && disbursement.status !== "rejected" && (
-                        <button
-                          onClick={() => handleEdit(disbursement)}
-                          className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition"
-                          title="Modifier"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                      )}
-                     {canValidate && disbursement.status === "draft" && (
-  <button
-    onClick={() => handleApprove(disbursement.id)}
-    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-    title="Valider"
-  >
-    <CheckCircle className="w-4 h-4" />
-  </button>
-)}
-
-{canValidate &&
-  (disbursement.status === "draft" ||
-    disbursement.status === "pending") && (
-    <button
-      onClick={() => handleReject(disbursement.id)}
-      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-      title="Rejeter"
-    >
-      <XCircle className="w-4 h-4" />
-    </button>
-  )}
-
-{canExecute && disbursement.status === "approved" && (
-  <button
-    onClick={() => handlePay(disbursement.id)}
-    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-    title="Marquer comme exécuté"
-  >
-    <CheckCircle className="w-4 h-4" />
-  </button>
-)}
-                      {canDelete && (
-                        <button
-                          onClick={() => handleDelete(disbursement.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    <RowActionMenu>
+                      <RowActionItem icon={<Eye />} onSelect={() => handleViewDetails(disbursement)}>Voir détails</RowActionItem>
+                      {canCreate && disbursement.status !== "approved" && disbursement.status !== "paid" && disbursement.status !== "rejected" && <RowActionItem icon={<FileText />} onSelect={() => handleEdit(disbursement)}>Modifier</RowActionItem>}
+                      {canValidate && disbursement.status === "draft" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApprove(disbursement.id)}>Valider</RowActionItem>}
+                      {canValidate && (disbursement.status === "draft" || disbursement.status === "pending") && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(disbursement.id)} destructive>Rejeter</RowActionItem>}
+                      {canExecute && disbursement.status === "approved" && <RowActionItem icon={<CheckCircle />} onSelect={() => handlePay(disbursement.id)}>Marquer comme exécuté</RowActionItem>}
+                      {canDelete && <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(disbursement.id)} destructive>Supprimer</RowActionItem>}
+                    </RowActionMenu>
                   </td>
                 </tr>
               ))}

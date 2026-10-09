@@ -7,9 +7,11 @@ import {
   ChevronDown, Filter, Send, CheckCircle2, AlertCircle, Clock, Eye,
   Building2, Phone, Mail, Tag, Plus, ClipboardCheck, History,
   Info,
+  Pencil, Trash2,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useAppData } from "../../context/AppDataContext";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 /* ─── Seed data ─────────────────────────────────────────────────────── */
 
@@ -1311,66 +1313,31 @@ setUploadProgress(30);
 </div>
     </button>
 
-    <div className="flex items-center gap-2 shrink-0">
-
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      handleViewSupplier(f);
-    }}
-    className="flex items-center gap-1 px-2 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs hover:bg-white hover:text-blue-600 transition"
-    title="Voir le fournisseur"
-  >
-    <Eye className="w-3.5 h-3.5" />
-    Voir
-  </button>
-
-  <button
-   onClick={(e) => {
-  e.stopPropagation();
-
-  console.log("=== MODIFIER FOURNISSEUR ===", f.id);
-
-  setEditingSupplierId(f.id);
-
-  setSupplierForm({
-    raison_sociale: f.name || "",
-    ninea: f.ninea || "",
-    rccm: f.rccm || "",
-    email: f.email || "",
-    phone: f.phone || "",
-    address: f.adresse || "",
-    logo: null,
-    contact_principal_nom: f.contact || "",
-    contact_principal_email: f.contactPrincipalEmail || "",
-    contact_principal_phone: f.contactPrincipalPhone || "",
-    payment_terms: f.paymentTerms || 30,
-    currency: f.currency || "XOF",
-    is_active: f.status === "Actif",
-  });
-
-  setShowSupplierForm(true);
-}}
-    className="flex items-center gap-1 px-2 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs hover:bg-white hover:text-blue-600 transition"
-    title="Modifier le fournisseur"
-  >
-    Modifier
-  </button>
-
-</div>
-<button
-  onClick={(e) => {
-    e.stopPropagation();
-
-    console.log("=== SUPPRIMER FOURNISSEUR ===", f.id);
-
-    handleDeleteSupplier(f);
-  }}
-  className="flex items-center gap-1 px-2 py-1.5 border border-red-200 text-red-600 rounded-lg text-xs hover:bg-red-50 transition"
-  title="Supprimer le fournisseur"
->
-  Supprimer
-</button>
+    <div className="shrink-0" onClick={(event) => event.stopPropagation()}>
+      <RowActionMenu label="Actions fournisseur">
+        <RowActionItem icon={<Eye />} onSelect={() => handleViewSupplier(f)}>Voir</RowActionItem>
+        <RowActionItem icon={<Pencil />} onSelect={() => {
+          setEditingSupplierId(f.id);
+          setSupplierForm({
+            raison_sociale: f.name || "",
+            ninea: f.ninea || "",
+            rccm: f.rccm || "",
+            email: f.email || "",
+            phone: f.phone || "",
+            address: f.adresse || "",
+            logo: null,
+            contact_principal_nom: f.contact || "",
+            contact_principal_email: f.contactPrincipalEmail || "",
+            contact_principal_phone: f.contactPrincipalPhone || "",
+            payment_terms: f.paymentTerms || 30,
+            currency: f.currency || "XOF",
+            is_active: f.status === "Actif",
+          });
+          setShowSupplierForm(true);
+        }}>Modifier</RowActionItem>
+        <RowActionItem icon={<Trash2 />} onSelect={() => handleDeleteSupplier(f)} destructive>Supprimer</RowActionItem>
+      </RowActionMenu>
+    </div>
 
   </div>
 </div>
@@ -1488,13 +1455,9 @@ setUploadProgress(30);
                             </td>
                             <td className="py-2.5">
                               {(o.status === "Brouillon" || o.status === "En cours") && (
-                                <button
-                                  onClick={() => setSendBDCTarget(o)}
-                                  className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition"
-                                >
-                                  <Send className="w-3 h-3" />
-                                  Envoyer
-                                </button>
+                                <RowActionMenu>
+                                  <RowActionItem icon={<Send />} onSelect={() => setSendBDCTarget(o)}>Envoyer</RowActionItem>
+                                </RowActionMenu>
                               )}
                               
                               {(o.status === "Validé" || o.status === "Confirmé" || o.status === "Livré") && (
@@ -1537,22 +1500,10 @@ setUploadProgress(30);
                             </td>
                             <td className="py-2.5">
                               <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => generateBLPdf(d, selectedF)}
-                                  className="flex items-center gap-1 px-2 py-1.5 border border-gray-200 text-gray-700 rounded-lg text-xs hover:bg-gray-50 transition"
-                                >
-                                  <Download className="w-3 h-3" />
-                                  PDF
-                                </button>
-                                {(d.status === "Complète" || d.status === "Partielle" || d.status === "En attente") && (
-                                  <button
-                                    onClick={() => setConformiteTarget(d)}
-                                    className="flex items-center gap-1 px-2 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition"
-                                  >
-                                    <ClipboardCheck className="w-3 h-3" />
-                                    Vérifier
-                                  </button>
-                                )}
+                                <RowActionMenu>
+                                  <RowActionItem icon={<Download />} onSelect={() => generateBLPdf(d, selectedF)}>Télécharger PDF</RowActionItem>
+                                  {(d.status === "Complète" || d.status === "Partielle" || d.status === "En attente") && <RowActionItem icon={<ClipboardCheck />} onSelect={() => setConformiteTarget(d)}>Vérifier</RowActionItem>}
+                                </RowActionMenu>
                                 {d.conformite && (
                                   <span title={d.conformite} className="cursor-help">
                                     <CheckCircle2 className="w-4 h-4 text-green-500" />

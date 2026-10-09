@@ -18,6 +18,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useAppData } from "../../context/AppDataContext";
 import { RejectModal } from "../shared/RejectModal";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 import { apiRequest } from "../../apiClient";
 import { createTreasuryAccount } from "../../data/treasuryData";
 
@@ -984,91 +985,16 @@ try {
                         {p.date}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {canCreate && p.status === "created" && (
-                            <button
-                              onClick={() =>
-                                advanceStatus(p.id, "pending_validation")
-                              }
-                              title="Soumettre"
-                              className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-                            >
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {canDelete && p.status === "created" && (
-                            <button
-                              onClick={() => deletePayment(p.id, (p as any).reference)}
-                              title="Supprimer"
-                              className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {canAuthorize && p.status === "pending_validation" && (
-                            <>
-                              <button
-                                onClick={() => advanceStatus(p.id, "validated")}
-                                title="Valider/Autoriser"
-                                className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5" />
-                              </button>
-                              
-                                
-                              
-                              
-                              <button
-                                onClick={() => handleReject(p.id, p.id)}
-                                title="Rejeter"
-                                className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition"
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-
-                          {canValidateDG && (p.status as PaymentStatus) === "validated" && (
-                         <button
-                          onClick={() => advanceStatus(p.id, "dg_validated")}
-                          title="Valider DG"
-                           className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-                          >
-                          <CheckCircle className="w-3.5 h-3.5" />
-                         </button>
-                          )}
-                          
-                          {canExecute && p.status === "dg_validated" && (
-                            <button
-                              onClick={() => advanceStatus(p.id, "executed")}
-                              title="Exécuter"
-                              className="p-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition"
-                            >
-                              <Zap className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-
-                          
-                          {canExecute && p.status === "executed" && (
-                            <button
-                              onClick={() => advanceStatus(p.id, "completed")}
-                              title="Terminer"
-                              className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              setSelectedPayment(p);
-                              setShowDetailModal(true);
-                            }}
-                            title="Voir détails"
-                            className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        <RowActionMenu>
+                          {canCreate && p.status === "created" && <RowActionItem icon={<ArrowRight />} onSelect={() => advanceStatus(p.id, "pending_validation")}>Soumettre</RowActionItem>}
+                          {canDelete && p.status === "created" && <RowActionItem icon={<Trash2 />} onSelect={() => deletePayment(p.id, (p as any).reference)} destructive>Supprimer</RowActionItem>}
+                          {canAuthorize && p.status === "pending_validation" && <RowActionItem icon={<CheckCircle />} onSelect={() => advanceStatus(p.id, "validated")}>Valider / Autoriser</RowActionItem>}
+                          {canAuthorize && p.status === "pending_validation" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(p.id, p.id)} destructive>Rejeter</RowActionItem>}
+                          {canValidateDG && (p.status as PaymentStatus) === "validated" && <RowActionItem icon={<CheckCircle />} onSelect={() => advanceStatus(p.id, "dg_validated")}>Valider DG</RowActionItem>}
+                          {canExecute && p.status === "dg_validated" && <RowActionItem icon={<Zap />} onSelect={() => advanceStatus(p.id, "executed")}>Exécuter</RowActionItem>}
+                          {canExecute && p.status === "executed" && <RowActionItem icon={<CheckCircle />} onSelect={() => advanceStatus(p.id, "completed")}>Terminer</RowActionItem>}
+                          <RowActionItem icon={<Eye />} onSelect={() => { setSelectedPayment(p); setShowDetailModal(true); }}>Voir détails</RowActionItem>
+                        </RowActionMenu>
                       </td>
                     </tr>
                   );

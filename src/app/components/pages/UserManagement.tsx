@@ -3,6 +3,7 @@ import { Search, Plus, Edit, Trash2, UserCheck, UserX, Shield, Lock } from "luci
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../apiClient";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 const roles = [
   { label: "Admin", value: "ADMIN" },
@@ -609,33 +610,16 @@ console.log("=== ERREUR COMPLÈTE ===", error);
                      : "Jamais"}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleOpenModal(user)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="Modifier"
+                    <RowActionMenu>
+                      <RowActionItem icon={<Edit />} onSelect={() => handleOpenModal(user)}>Modifier</RowActionItem>
+                      <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(user.id)} destructive>Supprimer</RowActionItem>
+                      <RowActionItem
+                        icon={user.status === "active" ? <UserX /> : <UserCheck />}
+                        onSelect={() => handleToggleStatus(user.id)}
                       >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleToggleStatus(user.id)}
-                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                        title={user.status === "active" ? "Désactiver" : "Activer"}
-                      >
-                        {user.status === "active" ? (
-                          <UserX className="w-4 h-4" />
-                        ) : (
-                          <UserCheck className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
+                        {user.status === "active" ? "Désactiver" : "Activer"}
+                      </RowActionItem>
+                    </RowActionMenu>
                   </td>
                 </tr>
               ))}

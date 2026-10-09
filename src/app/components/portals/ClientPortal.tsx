@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { ShoppingCart, Truck, FileText, CreditCard, LogOut, FileSearch, Users } from "lucide-react";
+import { ShoppingCart, Truck, FileText, CreditCard, LogOut, FileSearch, Users, Check, X, Download } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 const CLIENT_QUOTES = [
   { id: "DEV-2026-001", date: "2026-04-01", designation: "Prestation conseil", amount: 2400000, status: "Validé" },
@@ -175,20 +176,10 @@ export function ClientPortal() {
                         <td className="py-3 pr-4"><QuoteStatusBadge status={status} /></td>
                         <td className="py-3">
                           {status === "En attente" && (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setQuoteStatuses((prev) => ({ ...prev, [q.id]: "Validé" }))}
-                                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition"
-                              >
-                                Accepter
-                              </button>
-                              <button
-                                onClick={() => setQuoteStatuses((prev) => ({ ...prev, [q.id]: "Refusé" }))}
-                                className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition"
-                              >
-                                Refuser
-                              </button>
-                            </div>
+                            <RowActionMenu>
+                              <RowActionItem icon={<Check />} onSelect={() => setQuoteStatuses((prev) => ({ ...prev, [q.id]: "Validé" }))}>Accepter</RowActionItem>
+                              <RowActionItem icon={<X />} onSelect={() => setQuoteStatuses((prev) => ({ ...prev, [q.id]: "Refusé" }))} destructive>Refuser</RowActionItem>
+                            </RowActionMenu>
                           )}
                         </td>
                       </tr>
@@ -289,9 +280,9 @@ export function ClientPortal() {
                       <td className="py-3 pr-4 text-gray-600">{inv.dueDate}</td>
                       <td className="py-3 pr-4"><InvoiceStatusBadge status={inv.status} /></td>
                       <td className="py-3">
-                        <button onClick={() => alert("Téléchargement en cours...")} className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition">
-                          Télécharger
-                        </button>
+                        <RowActionMenu>
+                          <RowActionItem icon={<Download />} onSelect={() => alert("Téléchargement en cours...")}>Télécharger</RowActionItem>
+                        </RowActionMenu>
                       </td>
                     </tr>
                   ))}

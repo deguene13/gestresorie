@@ -16,6 +16,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useAppData } from "../../context/AppDataContext";
 import { RejectModal } from "../shared/RejectModal";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 import {
   getProducts,
   createProduct,
@@ -1183,121 +1184,17 @@ const handleReject = (id: string, ref: string) => {
                      {formatDate(order.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex gap-2">
-  <button
-    onClick={(e) => {
-  e.stopPropagation();
-  console.log("=== BOUTON VOIR DÉTAIL CLIQUÉ ===");
-  console.log("ORDER :", order);
-  handleViewDetails(order);
-}}
-    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-    title="Voir détails"
-  >
-    <Eye className="w-4 h-4" />
-  </button>
-  {canEdit && order.status === "draft" && (
-  <button
-    type="button"
-   onClick={(e) => {
-  e.stopPropagation();
-  alert(`MODIFIER : ${order.reference}`);
-  console.log("=== BOUTON MODIFIER CLIQUÉ ===", order);
-  handleEdit(order);
-}}
-    className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition"
-    title="Modifier"
-  >
-    <Edit className="w-4 h-4" />
-  </button>
-)}
-
-
-{/* ================= DAF ================= */}
-
-{/* Valider DAF */}
-{canValidateDaf && order.status === "pending_daf_approval" && (
-  <button
-    onClick={() => handleApprove(order.id)}
-    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-    title="Valider (DAF)"
-  >
-    <CheckCircle className="w-4 h-4" />
-  </button>
-)}
-
-{/* Rejeter DAF */}
-{canValidateDaf && order.status === "pending_daf_approval" && (
-  <button
-    onClick={() => handleReject(order.id, order.reference)}
-    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-    title="Rejeter (DAF)"
-  >
-    <XCircle className="w-4 h-4" />
-  </button>
-)}
-
-
-{/* ================= DG ================= */}
-
-{/* Valider définitivement */}
-{canValidate && order.status === "pending_dg_approval" && (
-  <button
-    onClick={() => handleApprove(order.id)}
-    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-    title="Valider définitivement (DG)"
-  >
-    <CheckCircle className="w-4 h-4" />
-  </button>
-)}
-
-{/* Rejeter DG */}
-{canValidate && order.status === "pending_dg_approval" && (
-  <button
-    onClick={() => handleReject(order.id, order.reference)}
-    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-    title="Rejeter (DG)"
-  >
-    <XCircle className="w-4 h-4" />
-  </button>
-)}
-
-
-{/* ================= SOUMISSION ================= */}
-
-{canEdit && order.status?.toLowerCase() === "draft" && (
-  <button
-    onClick={() => handleSubmitForApproval(order.id)}
-    className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition"
-    title="Soumettre pour approbation"
-  >
-    <Send className="w-4 h-4" />
-  </button>
-)}
-
-
-{/* ================= FOURNISSEUR ================= */}
-
-{canEdit && order.status?.toLowerCase() === "approved" && (
-  <button
-    onClick={() => handleSendToSupplier(order.id)}
-    className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition"
-    title="Envoyer au fournisseur"
-  >
-    <Send className="w-4 h-4" />
-  </button>
-)}
-
-  {canDelete && (
-    <button
-      onClick={() => handleDelete(order.id)}
-      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-      title="Supprimer"
-    >
-      <Trash2 className="w-4 h-4" />
-    </button>
-  )}
-</div>
+                      <RowActionMenu>
+                        <RowActionItem icon={<Eye />} onSelect={() => handleViewDetails(order)}>Voir détails</RowActionItem>
+                        {canEdit && order.status === "draft" && <RowActionItem icon={<Edit />} onSelect={() => handleEdit(order)}>Modifier</RowActionItem>}
+                        {canValidateDaf && order.status === "pending_daf_approval" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApprove(order.id)}>Valider (DAF)</RowActionItem>}
+                        {canValidateDaf && order.status === "pending_daf_approval" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(order.id, order.reference)} destructive>Rejeter (DAF)</RowActionItem>}
+                        {canValidate && order.status === "pending_dg_approval" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApprove(order.id)}>Valider définitivement (DG)</RowActionItem>}
+                        {canValidate && order.status === "pending_dg_approval" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(order.id, order.reference)} destructive>Rejeter (DG)</RowActionItem>}
+                        {canEdit && order.status?.toLowerCase() === "draft" && <RowActionItem icon={<Send />} onSelect={() => handleSubmitForApproval(order.id)}>Soumettre pour approbation</RowActionItem>}
+                        {canEdit && order.status?.toLowerCase() === "approved" && <RowActionItem icon={<Send />} onSelect={() => handleSendToSupplier(order.id)}>Envoyer au fournisseur</RowActionItem>}
+                        {canDelete && <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(order.id)} destructive>Supprimer</RowActionItem>}
+                      </RowActionMenu>
                     </td>
                   </tr>
                 );

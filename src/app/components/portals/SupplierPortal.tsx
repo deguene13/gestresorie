@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { ShoppingCart, Truck, FileText, CreditCard, LogOut, Package, Upload, X } from "lucide-react";
+import { ShoppingCart, Truck, FileText, CreditCard, LogOut, Package, Upload, X, Check, Download } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 const SUPPLIER_ORDERS = [
   { id: "BDC-2024-158", date: "2026-04-15", items: "Chaises de bureau (20)", amount: 1500000, status: "Validé" },
@@ -426,15 +427,11 @@ export function SupplierPortal() {
                       <td className="py-3 pr-4 font-semibold text-gray-900">{formatAmount(o.amount)}</td>
                       <td className="py-3 pr-4"><OrderStatusBadge status={o.status} /></td>
                       <td className="py-3">
-                        {o.status === "Validé" && (
-                          <button onClick={() => alert(`BDC ${o.id} accepté.`)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition">
-                            Accepter
-                          </button>
-                        )}
-                        {o.status === "En cours" && (
-                          <button onClick={() => alert(`Préparation BL pour ${o.id}.`)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition">
-                            Préparer BL
-                          </button>
+                        {(o.status === "Validé" || o.status === "En cours") && (
+                          <RowActionMenu>
+                            {o.status === "Validé" && <RowActionItem icon={<Check />} onSelect={() => alert(`BDC ${o.id} accepté.`)}>Accepter</RowActionItem>}
+                            {o.status === "En cours" && <RowActionItem icon={<Truck />} onSelect={() => alert(`Préparation BL pour ${o.id}.`)}>Préparer BL</RowActionItem>}
+                          </RowActionMenu>
                         )}
                       </td>
                     </tr>
@@ -470,9 +467,9 @@ export function SupplierPortal() {
                       <td className="py-3 pr-4 text-gray-700">{d.items}</td>
                       <td className="py-3 pr-4"><DeliveryStatusBadge status={d.status} /></td>
                       <td className="py-3">
-                        <button onClick={() => generateBLPdf(d)} className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition">
-                          Télécharger BL
-                        </button>
+                        <RowActionMenu>
+                          <RowActionItem icon={<Download />} onSelect={() => generateBLPdf(d)}>Télécharger BL</RowActionItem>
+                        </RowActionMenu>
                       </td>
                     </tr>
                   ))}
@@ -514,9 +511,9 @@ export function SupplierPortal() {
                       <td className="py-3 pr-4 text-gray-600">{inv.dueDate}</td>
                       <td className="py-3 pr-4"><InvoiceStatusBadge status={inv.status} /></td>
                       <td className="py-3">
-                        <button onClick={() => setShowInvoiceModal(true)} className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition">
-                          Déposer facture
-                        </button>
+                        <RowActionMenu>
+                          <RowActionItem icon={<Upload />} onSelect={() => setShowInvoiceModal(true)}>Déposer facture</RowActionItem>
+                        </RowActionMenu>
                       </td>
                     </tr>
                   ))}

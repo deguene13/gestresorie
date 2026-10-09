@@ -8,6 +8,7 @@ import {
   ToggleRight,
   X,
   Users,
+  Eye,
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useAppData } from "../../context/AppDataContext";
 import type { Customer } from "../../data/customersData";
 import { apiRequest } from "../../apiClient";
+import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 import {
   getCustomers,
@@ -605,44 +607,17 @@ const handleViewCustomer = async (customer: Customer) => {
         {/* ACTIONS */}
         <td className="p-3">
           {canManage && (
-            <div className="flex gap-2">
-              <button
-  type="button"
-  onClick={() => handleViewCustomer(client)}
-  className="px-2 py-1 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50"
->
-  Voir
-</button>
-
-              <button
-                onClick={() =>
-                  openEdit(client)
-                }
+            <RowActionMenu>
+              <RowActionItem icon={<Eye />} onSelect={() => handleViewCustomer(client)}>Voir</RowActionItem>
+              <RowActionItem icon={<Edit2 />} onSelect={() => openEdit(client)}>Modifier</RowActionItem>
+              <RowActionItem
+                icon={client.is_active ? <ToggleRight /> : <ToggleLeft />}
+                onSelect={() => handleToggleStatus(client)}
               >
-                <Edit2 className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() =>
-                  handleToggleStatus(client)
-                }
-              >
-                {client.is_active ? (
-                  <ToggleRight className="w-5 h-5" />
-                ) : (
-                  <ToggleLeft className="w-5 h-5" />
-                )}
-              </button>
-
-              <button
-                onClick={() =>
-                  handleDelete(client)
-                }
-              >
-                <Trash2 className="w-4 h-4 text-red-600" />
-              </button>
-
-            </div>
+                {client.is_active ? "Désactiver" : "Activer"}
+              </RowActionItem>
+              <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(client)} destructive>Supprimer</RowActionItem>
+            </RowActionMenu>
           )}
         </td>
 
