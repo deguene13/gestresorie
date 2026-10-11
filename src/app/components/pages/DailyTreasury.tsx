@@ -23,10 +23,12 @@ import { deleteTreasuryAccount } from "../../data/treasuryData";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+
 type CirculatingCheck = {
   id: string;
   date: string;
   chequeNum: string;
+  banque: string;
   beneficiary: string;
   reference: string;
   montant: number;
@@ -259,6 +261,16 @@ const [treasuryLoading, setTreasuryLoading] = useState(true);
       );
 
       setTreasuryAccounts(accounts);
+      console.log(
+  "=== BANQUES ET COMPTES DE TRÉSORERIE ===",
+  accounts.map((account: any) => ({
+    id: account.id,
+    name: account.name,
+    type: account.type,
+    bankName: account.bankName,
+    accountNumber: account.accountNumber,
+  }))
+);
       
 
       console.log(
@@ -266,6 +278,23 @@ const [treasuryLoading, setTreasuryLoading] = useState(true);
       );
 
       const transactions = await getTreasuryTransactions();
+      console.log(
+  "=== DÉTAILS BANCAIRES DES TRANSACTIONS ===",
+  transactions.map((transaction: any) => ({
+    reference: transaction.reference,
+    account: transaction.account,
+    accountName: transaction.account_name,
+    bankName: transaction.bank_name,
+    bank: transaction.bank,
+  }))
+);
+      console.log(
+  "=== TRANSACTIONS LIÉES AUX PAIEMENTS CLIENTS ===",
+  transactions.filter((transaction: any) =>
+    transaction.source === "CUSTOMER_PAYMENT" ||
+    transaction.reference?.startsWith("PAY-CLI-")
+  )
+);
     console.log(
   "=== TRANSACTIONS DJANGO POUR CHARGES ===",
   JSON.stringify(transactions, null, 2)
@@ -326,6 +355,7 @@ const circulatingChecks: CirculatingCheck[] = payments
       ? new Date(payment.created_at).toLocaleDateString("fr-FR")
       : "—",
     chequeNum: payment.cheque_number || "—",
+    banque: payment.treasury_account_name || "—",
     beneficiary: payment.supplier_name || "—",
     reference: payment.reference || "—",
     montant: Number(payment.amount),
@@ -340,11 +370,26 @@ console.log(
   "=== DAILY TREASURY : CHÈQUES EN CIRCULATION ===",
   circulatingChecks
 );
+console.log("DÉTAIL PAIEMENT FOURNISSEUR :", payments);
 
 setCirculating(circulatingChecks);
 
-// ─── Chèques impayés ─────────────────────────────────────
-
+// ─── Chèques impayés ───
+// ──────────────────────────────────
+console.log(
+  "=== NUMÉROS DES CHÈQUES IMPAYÉS ===",
+  payments
+    .filter(
+      (payment: any) =>
+        payment.payment_method === "CHECK" &&
+        payment.status === "REJECTED"
+    )
+    .map((payment: any) => ({
+      reference: payment.reference,
+      cheque_number: payment.cheque_number,
+      treasury_account_name: payment.treasury_account_name,
+    }))
+);
 const unpaidChecks: UnpaidCheck[] = payments
   .filter(
     (payment: any) =>
@@ -364,7 +409,7 @@ const unpaidChecks: UnpaidCheck[] = payments
 
     client: payment.supplier_name || "—",
 
-    banque: "—",
+   banque: payment.treasury_account_name || "—",
 
     motif: payment.rejection_reason || "Rejet du paiement",
 
@@ -412,6 +457,15 @@ console.log(
 console.log(
   "=== CHAMPS PAIEMENT CLIENT ===",
   Object.keys(customerPayments[0] || {})
+);
+console.log(
+  "=== RÉFÉRENCES PAIEMENTS CLIENTS ===",
+  customerPayments.map((payment: any) => ({
+    id: payment.id,
+    reference: payment.reference,
+    payment_method: payment.payment_method,
+    status: payment.status,
+  }))
 );
 
 
@@ -796,13 +850,18 @@ const border = (
     );
 
     // ── Section 2: Valeurs à l'encaissement ───────────────────────────────
-    // Cols C(3)=Référence, D(4)=Client, E(5)=Montant, F(6)=Banque, G(7)=Échéance, H(8)=Statut
-    writeSection(
-      "Valeurs à l'encaissement",
-      ["Référence", "Client / Émetteur", "Montant", "Banque", "Échéance", "Statut"],
-      incoming.map((v) => [v.reference, v.client, v.montant, v.banque, v.echeance, v.statut]),
-      3, 4, 5,
-    );
+writeSection(
+  "Valeurs à l'encaissement",
+  ["Référence", "Client / Émetteur", "Montant", "Échéance", "Statut"],
+  incoming.map((v) => [
+    v.reference,
+    v.client,
+    v.montant,
+    v.echeance,
+    v.statut,
+  ]),
+  3, 4, 5,
+);
 
     // ── Section 3: Engagements en cours ───────────────────────────────────
     writeSection(
@@ -818,7 +877,7 @@ const border = (
     // ── Section 5: Chèques impayés ────────────────────────────────────────
     writeSection(
       "Chèques impayés / Incidents de paiement",
-      ["Chèque N°", "Client", "Montant", "Banque", "Date émission", "Motif", "Relances", "Statut"],
+      ["Chèque N°", "Fournisseur", "Montant", "Banque", "Motif", "Relances", "Statut"],
      unpaid.map((u) => [
        u.chequeNum,
        u.client,
@@ -1967,7 +2026,18 @@ const payload = {
           <FilterButtons options={["Tous", "En circulation", "Débité", "Annulé"]} value={circStatus} onChange={(v) => { setCircStatus(v); setCircPage(1); }} />
           <button
             onClick={() => setCirculating((prev) => [
-              { id: `VC-${String(prev.length + 1).padStart(3, "0")}`, date: new Date().toLocaleDateString("fr-FR"), chequeNum: "", beneficiary: "", reference: "NOUVEAU", montant: 0, echeance: "—", observation: "", statut: "En circulation" },
+             {
+  id: `VC-${String(prev.length + 1).padStart(3, "0")}`,
+  date: new Date().toLocaleDateString("fr-FR"),
+  chequeNum: "",
+  banque: "",
+  beneficiary: "",
+  reference: "NOUVEAU",
+  montant: 0,
+  echeance: "—",
+  observation: "",
+  statut: "En circulation",
+},
               ...prev,
             ])}
             className="ml-auto flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs hover:from-blue-700 hover:to-indigo-700 transition"
@@ -1978,35 +2048,27 @@ const payload = {
 
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full min-w-[900px] text-sm">
-            {TH(["Date", "N° Chèque", "Bénéficiaire", "Référence", "Montant", "Échéance", "Observation", "Statut", ""])}
+          
+            {TH(["Date", "N° Chèque", "Banque", "Bénéficiaire", "Référence", "Montant", "Échéance", "Observation", "Statut", ""])}
+
             <tbody className="divide-y divide-gray-100">
               {circPaged.slice.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm">Aucune valeur en circulation</td></tr>
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400 text-sm">Aucune valeur en circulation</td></tr>
               )}
               {circPaged.slice.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50 transition">
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{c.date}</td>
                   <td className="px-4 py-3 font-mono font-medium text-gray-900">{c.chequeNum || "—"}</td>
+                  <td className="px-4 py-3 text-gray-500"> {c.banque || "—"} </td>
                   <td className="px-4 py-3 font-medium text-gray-900 max-w-[180px] truncate">{c.beneficiary || "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{c.reference}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{fmt(c.montant)}</td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{c.echeance}</td>
                   <td className="px-4 py-3 text-gray-400 text-xs max-w-[140px] truncate">{c.observation || "—"}</td>
                   <td className="px-4 py-3"><Badge status={c.statut} /></td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => setEditingCirc({ ...c })} title="Modifier"
-                        className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition">
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setCirculating((prev) => prev.map((x) => x.id === c.id ? { ...x, statut: "Débité" } : x))}
-                        disabled={c.statut !== "En circulation"} title="Marquer débité"
-                        className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition disabled:opacity-30">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
+                   <td className="px-4 py-3">
+                   
+                </td>
                 </tr>
               ))}
             </tbody>
@@ -2048,28 +2110,21 @@ const payload = {
 
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full min-w-[850px] text-sm">
-           {TH(["Date", "Référence", "Banque", "Client", "Montant", "Échéance", "Statut", ""])}
+           {TH(["Date", "Référence", "Client", "Montant", "Échéance", "Statut", ""])}
             <tbody className="divide-y divide-gray-100">
               {incomPaged.slice.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400 text-sm">Aucune valeur à l'encaissement</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400 text-sm">Aucune valeur à l'encaissement</td></tr>
               )}
               {incomPaged.slice.map((v) => (
                 <tr key={v.id} className="hover:bg-gray-50 transition">
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{v.date}</td>
                   <td className="px-4 py-3 font-mono text-gray-900">{v.reference || "—"}</td>
-                  <td className="px-4 py-3 text-gray-700">{v.banque || "—"}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{v.client || "—"}</td>
                   <td className="px-4 py-3 font-semibold text-green-700 whitespace-nowrap">{fmt(v.montant)}</td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{v.echeance || "—"}</td>
                   <td className="px-4 py-3"><Badge status={v.statut} /></td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => setIncoming((prev) => prev.map((x) => x.id === v.id ? { ...x, statut: "Encaissé" } : x))}
-                      disabled={v.statut !== "À encaisser"}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs border border-green-200 transition disabled:opacity-30"
-                    >
-                      <CheckCircle className="w-3 h-3" /> Encaisser
-                    </button>
+                    
                   </td>
                 </tr>
               ))}
@@ -2163,7 +2218,7 @@ const payload = {
 
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full min-w-[900px] text-sm">
-            {TH(["Date", "N° Chèque", "Client", "Banque", "Motif du rejet", "Montant", "Relances", "Statut", "Actions"])}
+            {TH(["Date", "N° Chèque", "Fournisseur", "Banque", "Motif du rejet", "Montant", "Relances", "Statut", "Actions"])}
             <tbody className="divide-y divide-gray-100">
               {filteredUnpaid.length === 0 && (
                 <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm">Aucun chèque impayé</td></tr>

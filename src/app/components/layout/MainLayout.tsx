@@ -210,7 +210,13 @@ export function MainLayout() {
       return () => { active = false; };
     }
 
-    setCompanyBranding(null);
+    const authenticatedCompany = auth.user?.company ?? null;
+    setCompanyBranding({
+      userId,
+      companyId: authenticatedCompany?.id ?? null,
+      name: authenticatedCompany?.name ?? "",
+      logo: authenticatedCompany?.logo ?? null,
+    });
     setFailedLogoUrl(null);
 
     const loadCompanyBranding = async () => {
@@ -254,8 +260,12 @@ export function MainLayout() {
     };
 
     loadCompanyBranding();
-    return () => { active = false; };
-  }, [auth.user?.id, auth.user?.company?.id]);
+    window.addEventListener("company-branding-updated", loadCompanyBranding);
+    return () => {
+      active = false;
+      window.removeEventListener("company-branding-updated", loadCompanyBranding);
+    };
+  }, [auth.user?.id, auth.user?.company?.id, auth.user?.company?.name, auth.user?.company?.logo]);
 
   // Route guard: redirect after auth is initialized
   useEffect(() => {
@@ -279,6 +289,28 @@ export function MainLayout() {
   const companyLogoUrl = visibleCompanyBranding?.logo
     ? resolveCompanyLogoUrl(visibleCompanyBranding.logo)
     : null;
+  const renderSidebarBranding = (iconSize: number) => {
+    if (!companyLogoUrl || failedLogoUrl === companyLogoUrl) {
+      return <DiperfloLogo iconSize={iconSize} onDark={false} />;
+    }
+
+    return (
+      <div className="flex min-w-0 items-center gap-3">
+        <img
+          src={companyLogoUrl}
+          alt={visibleCompanyBranding?.name ? `Logo ${visibleCompanyBranding.name}` : "Logo entreprise"}
+          className="flex-shrink-0 rounded-lg border border-gray-200 bg-white object-contain"
+          style={{ width: iconSize, height: iconSize }}
+          onError={() => setFailedLogoUrl(companyLogoUrl)}
+        />
+        {visibleCompanyBranding?.name && (
+          <span className="min-w-0 truncate text-sm font-semibold text-gray-800">
+            {visibleCompanyBranding.name}
+          </span>
+        )}
+      </div>
+    );
+  };
 
   const achatChildrenI18n = [
     { icon: ShoppingCart,    label: t.nav.purchaseOrders[lang],    path: "/app/purchase-orders",      perm: "purchase_orders:view" },
@@ -423,7 +455,7 @@ export function MainLayout() {
       {/* Sidebar - Desktop */}
       <div className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r lg:border-gray-200 lg:bg-white">
         <div className="flex items-center h-16 px-4 border-b border-gray-200 flex-shrink-0">
-          <DiperfloLogo iconSize={36} onDark={false} />
+          {renderSidebarBranding(36)}
         </div>
         <SidebarContent onNavigate={(path) => handleNavigate(path)} />
       </div>
@@ -439,7 +471,7 @@ export function MainLayout() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 flex-shrink-0">
-              <DiperfloLogo iconSize={32} onDark={false} />
+              {renderSidebarBranding(32)}
               <button onClick={() => setSidebarOpen(false)}>
                 <X className="w-6 h-6 text-gray-500" />
               </button>

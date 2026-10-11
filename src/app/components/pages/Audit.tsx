@@ -13,6 +13,26 @@ export default function Audit() {
 
   const [selectedAudit, setSelectedAudit] = useState<any | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const filteredAudits = audits.filter((audit) => {
+  if (!startDate && !endDate) return true;
+  if (!audit.timestamp) return false;
+
+  const date = new Date(audit.timestamp);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const dateKey = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  return (
+    (!startDate || dateKey >= startDate) &&
+    (!endDate || dateKey <= endDate)
+  );
+});
 
   const handleViewDetail = async (id: string) => {
   try {
@@ -47,10 +67,59 @@ export default function Audit() {
           </p>
         </div>
       </div>
+      {/* Recherche par période */}
+<div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+  <div className="flex flex-wrap items-end gap-4">
+    <div>
+      <label
+        htmlFor="audit-start-date"
+        className="block text-sm font-medium text-gray-700 mb-1"
+      >
+        Du
+      </label>
+      <input
+        id="audit-start-date"
+        type="date"
+        value={startDate}
+        max={endDate || undefined}
+        onChange={(e) => setStartDate(e.target.value)}
+        className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+      />
+    </div>
+
+    <div>
+      <label
+        htmlFor="audit-end-date"
+        className="block text-sm font-medium text-gray-700 mb-1"
+      >
+        Au
+      </label>
+      <input
+        id="audit-end-date"
+        type="date"
+        value={endDate}
+        min={startDate || undefined}
+        onChange={(e) => setEndDate(e.target.value)}
+        className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+      />
+    </div>
+
+    <button
+      type="button"
+      onClick={() => {
+        setStartDate("");
+        setEndDate("");
+      }}
+      className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+    >
+      Réinitialiser
+    </button>
+  </div>
+</div>
 
       {/* Tableau */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {audits.length === 0 ? (
+        {filteredAudits.length === 0 ? (
           <div className="p-6">
             <p className="text-gray-500">
               Aucune entrée d'audit trouvée.
@@ -81,9 +150,7 @@ export default function Audit() {
                     Modification
                   </th>
 
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    IP
-                  </th>
+                  
 
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
                     Détail
@@ -92,7 +159,7 @@ export default function Audit() {
               </thead>
 
               <tbody className="divide-y divide-gray-200">
-                {audits.map((audit) => (
+                {filteredAudits.map((audit) => (
                   <tr
                     key={audit.id}
                     className="hover:bg-gray-50"
@@ -170,9 +237,7 @@ export default function Audit() {
                     </td>
 
                     {/* IP */}
-                    <td className="px-4 py-4 text-sm text-gray-600">
-                      {audit.ip || "—"}
-                    </td>
+                    
 
                     {/* Détail */}
                     <td className="px-4 py-4 text-center">

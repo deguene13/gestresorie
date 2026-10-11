@@ -571,6 +571,9 @@ return authUser;
     localStorage.removeItem("auth_user");
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    sessionStorage.removeItem("auth_user");
+    sessionStorage.removeItem("access_token");
+    sessionStorage.removeItem("refresh_token");
   };
 
 

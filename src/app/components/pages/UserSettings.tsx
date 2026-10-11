@@ -350,6 +350,7 @@ setCompanies(companiesResponse?.results || []);
           );
 
           setCompany(updatedCompany);
+          window.dispatchEvent(new Event("company-branding-updated"));
 
           setFormData((prev) => ({
             ...prev,

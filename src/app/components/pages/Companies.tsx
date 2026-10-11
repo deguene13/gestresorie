@@ -137,6 +137,7 @@ const handleEditCompany = async (company: Company) => {
       : item
   )
 );
+    window.dispatchEvent(new Event("company-branding-updated"));
 
     setEditingCompany(null);
     setShowForm(false);
