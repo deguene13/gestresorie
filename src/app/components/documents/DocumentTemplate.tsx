@@ -60,14 +60,10 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
   const headerAddress = data.headerAddress ?? data.companyAddress;
   const headerPhone = data.headerPhone ?? data.companyPhone;
   const headerEmail = data.headerEmail ?? data.companyEmail;
-  const headerLogo: string | undefined = data.headerLogo !== undefined
-    ? data.headerLogo ?? undefined
-    : data.companyLogo ?? data.clientLogo ?? undefined;
   const recipientName = data.recipientName ?? data.clientName;
   const recipientAddress = data.recipientAddress ?? data.clientAddress;
   const recipientPhone = data.recipientPhone ?? data.clientPhone;
   const recipientEmail = data.recipientEmail;
-  const recipientLogo = data.recipientLogo ?? undefined;
 
   return (
     <div className="space-y-6">
@@ -90,16 +86,7 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
           {/* Company Info */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              {headerLogo ? (
-                <img
-                  src={headerLogo}
-                  alt={`Logo ${headerName}`}
-                  className="h-16 w-16 flex-shrink-0 object-contain"
-                  onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
-                />
-              ) : (
-                <div className="h-16 w-16 flex-shrink-0" aria-hidden="true" />
-              )}
+              <div className="h-16 w-16 flex-shrink-0" aria-hidden="true" />
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                     {headerName}
@@ -165,7 +152,6 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
 
   {recipientEmail && <p>Email : {recipientEmail}</p>}
 </div>
-          {recipientLogo && <img src={recipientLogo} alt={`Logo ${recipientName}`} className="mt-3 h-12 w-12 object-contain" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} />}
         </div>
 
         {/* Items Table */}

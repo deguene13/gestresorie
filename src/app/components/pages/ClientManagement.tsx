@@ -543,17 +543,7 @@ const handleViewCustomer = async (customer: Customer) => {
         {/* NOM / RAISON SOCIALE */}
 <td className="p-3">
   <div className="flex items-center gap-3">
-    {client.logo ? (
-      <img
-        src={client.logo}
-        alt={`Logo ${client.raison_sociale}`}
-        className="h-10 w-10 object-contain border border-gray-200 rounded-lg p-1 bg-white"
-      />
-    ) : (
-      <div className="h-10 w-10 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-[10px] text-gray-400">
-        Logo
-      </div>
-    )}
+    <div className="h-10 w-10 flex-shrink-0" aria-hidden="true" />
 
     <span>{client.raison_sociale}</span>
   </div>
@@ -869,17 +859,7 @@ const handleViewCustomer = async (customer: Customer) => {
             <div className="p-5">
 
               <div className="flex items-center gap-4 mb-6">
-                {selectedCustomer.logo ? (
-                  <img
-                    src={selectedCustomer.logo}
-                    alt={`Logo ${selectedCustomer.raison_sociale}`}
-                    className="h-20 w-20 object-contain border border-gray-200 rounded-lg p-1 bg-white"
-                  />
-                ) : (
-                  <div className="h-20 w-20 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-xs text-gray-400">
-                    Logo
-                  </div>
-                )}
+                <div className="h-20 w-20 flex-shrink-0" aria-hidden="true" />
 
                 <div>
                   <p className="text-lg font-semibold text-gray-900">

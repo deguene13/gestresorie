@@ -496,21 +496,9 @@ export function MainLayout() {
 
           <div className="flex items-center gap-3">
             <div
-              className="flex min-w-0 items-center gap-2"
+              className="flex min-w-0 items-center"
               title={visibleCompanyBranding?.name || "Entreprise"}
             >
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-                {companyLogoUrl && failedLogoUrl !== companyLogoUrl ? (
-                  <img
-                    src={companyLogoUrl}
-                    alt={visibleCompanyBranding?.name ? `Logo ${visibleCompanyBranding.name}` : "Logo entreprise"}
-                    className="h-full w-full object-contain"
-                    onError={() => setFailedLogoUrl(companyLogoUrl)}
-                  />
-                ) : (
-                  <Building2 className="h-4 w-4 text-gray-400" />
-                )}
-              </div>
               <span className="hidden max-w-32 truncate text-sm font-medium text-gray-700 md:block">
                 {visibleCompanyBranding?.name || "Entreprise"}
               </span>

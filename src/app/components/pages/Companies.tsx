@@ -432,19 +432,6 @@ const handleDeleteCompany = async (company: Company) => {
   <p className="mt-1 text-xs text-gray-500">
     Facultatif — formats image uniquement.
   </p>
-  {editingCompany?.logo && (
-  <div className="mt-3">
-    <p className="text-sm text-gray-600 mb-2">
-      Logo actuel
-    </p>
-
-    <img
-      src={editingCompany.logo}
-      alt={`Logo ${editingCompany.name}`}
-      className="h-20 w-20 object-contain border border-gray-200 rounded-lg p-1"
-    />
-  </div>
-)}
 </div>
 
     <div className="flex justify-end gap-3 mt-5">
@@ -526,17 +513,7 @@ const handleDeleteCompany = async (company: Company) => {
               <tr key={company.id} className="border-t border-gray-100">
                <td className="px-4 py-3 font-medium text-gray-900">
   <div className="flex items-center gap-3">
-    {company.logo ? (
-      <img
-        src={company.logo}
-        alt={`Logo ${company.name}`}
-        className="h-10 w-10 object-contain border border-gray-200 rounded-lg p-1 bg-white"
-      />
-    ) : (
-      <div className="h-10 w-10 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-[10px] text-gray-400">
-        Logo
-      </div>
-    )}
+                  <div className="h-10 w-10 flex-shrink-0" aria-hidden="true" />
 
     <span>{company.name}</span>
   </div>
@@ -673,17 +650,7 @@ const handleDeleteCompany = async (company: Company) => {
             <div className="p-5">
 
               <div className="flex items-center gap-4 mb-6">
-                {selectedCompany.logo ? (
-                  <img
-                    src={selectedCompany.logo}
-                    alt={`Logo ${selectedCompany.name}`}
-                    className="h-20 w-20 object-contain border border-gray-200 rounded-lg p-1"
-                  />
-                ) : (
-                  <div className="h-20 w-20 flex items-center justify-center border border-gray-200 rounded-lg text-xs text-gray-400">
-                    Logo
-                  </div>
-                )}
+                <div className="h-20 w-20 flex-shrink-0" aria-hidden="true" />
 
                 <div>
                   <p className="text-lg font-semibold text-gray-900">
