@@ -61,9 +61,8 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   draft:          { label: "Brouillon",         color: "bg-gray-100 text-gray-700",       icon: Edit },
-  pending:        { label: "En attente DAF",    color: "bg-orange-100 text-orange-700",   icon: Clock },
-  validated_daf:  { label: "Validé par le DAF", color: "bg-blue-100 text-blue-700",       icon: CheckCircle },
-  pending_dg:     { label: "En attente DG",     color: "bg-violet-100 text-violet-700",   icon: Clock },
+  pending:        { label: "En attente DG", color: "bg-violet-100 text-violet-700", icon: Clock },
+  pending_dg:     { label: "En attente DG", color: "bg-violet-100 text-violet-700", icon: Clock },
   approved:       { label: "Validé définitiv.", color: "bg-green-100 text-green-700",     icon: CheckCircle },
   rejected:       { label: "Rejeté",            color: "bg-red-100 text-red-700",         icon: XCircle },
   sent:           { label: "Envoyé",            color: "bg-blue-100 text-blue-700",       icon: Send },
@@ -82,19 +81,11 @@ const normalizeStatus = (status: string) => {
 
     case "PENDING":
     case "PENDING_APPROVAL":
-      return "pending";
-
-   case "VALIDATED_DAF":
-  return "validated_daf";
-
-case "PENDING_DAF_APPROVAL":
-  return "pending_daf_approval";
-
-case "PENDING_DG":
-  return "pending_dg";
-
-case "PENDING_DG_APPROVAL":
-  return "pending_dg_approval";
+    case "PENDING_DAF_APPROVAL":
+    case "VALIDATED_DAF":
+    case "PENDING_DG":
+    case "PENDING_DG_APPROVAL":
+     return "pending_dg";
 
     case "APPROVED":
       return "approved";
@@ -150,7 +141,7 @@ export function PurchaseOrders() {
   const canCreate      = hasPermission("purchase_orders:create");
 const canEdit        = hasPermission("purchase_orders:edit");
 const canValidate    = hasPermission("purchase_orders:validate_dg");
-const canValidateDaf = hasPermission("purchase_orders:validate_daf");
+
 
 console.log("=== PERMISSIONS BDC ===");
 console.log("Utilisateur :", user);
@@ -160,10 +151,9 @@ console.log("Permissions :", user?.permissions);
 console.log("canCreate :", canCreate);
 console.log("canEdit :", canEdit);
 console.log("canValidate :", canValidate);
-console.log("canValidateDaf :", canValidateDaf);
 
   const canDelete      = hasRole(["admin"]);
-  const isViewOnly     = !canCreate && !canEdit && !canValidate && !canValidateDaf;
+ const isViewOnly = !canCreate && !canEdit && !canValidate;
   const [orders, setOrders] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -1187,10 +1177,8 @@ const handleReject = (id: string, ref: string) => {
                       <RowActionMenu>
                         <RowActionItem icon={<Eye />} onSelect={() => handleViewDetails(order)}>Voir détails</RowActionItem>
                         {canEdit && order.status === "draft" && <RowActionItem icon={<Edit />} onSelect={() => handleEdit(order)}>Modifier</RowActionItem>}
-                        {canValidateDaf && order.status === "pending_daf_approval" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApprove(order.id)}>Valider (DAF)</RowActionItem>}
-                        {canValidateDaf && order.status === "pending_daf_approval" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(order.id, order.reference)} destructive>Rejeter (DAF)</RowActionItem>}
-                        {canValidate && order.status === "pending_dg_approval" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApprove(order.id)}>Valider définitivement (DG)</RowActionItem>}
-                        {canValidate && order.status === "pending_dg_approval" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(order.id, order.reference)} destructive>Rejeter (DG)</RowActionItem>}
+                        {canValidate && order.status === "pending_dg" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleApprove(order.id)}>Valider définitivement (DG)</RowActionItem>}
+                        {canValidate && order.status === "pending_dg" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(order.id, order.reference)} destructive>Rejeter (DG)</RowActionItem>}
                         {canEdit && order.status?.toLowerCase() === "draft" && <RowActionItem icon={<Send />} onSelect={() => handleSubmitForApproval(order.id)}>Soumettre pour approbation</RowActionItem>}
                         {canEdit && order.status?.toLowerCase() === "approved" && <RowActionItem icon={<Send />} onSelect={() => handleSendToSupplier(order.id)}>Envoyer au fournisseur</RowActionItem>}
                         {canDelete && <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(order.id)} destructive>Supprimer</RowActionItem>}
@@ -1468,8 +1456,8 @@ const handleReject = (id: string, ref: string) => {
                 <div>
                   <span className="text-sm text-gray-600">Statut:</span>
                   <p>
-                    <span className={`inline-block px-3 py-1 text-xs rounded-full ${getStatusConfig(selectedOrder.status).color}`}>
-                      {getStatusConfig(selectedOrder.status).label}
+                    <span className={`inline-block px-3 py-1 text-xs rounded-full ${getStatusConfig(normalizeStatus(selectedOrder.status)).color}`}>
+                      {getStatusConfig(normalizeStatus(selectedOrder.status)).label}
                     </span>
                   </p>
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { apiRequest } from "../../apiClient";
 import {
   FileText, Package, Truck, ShoppingCart, ClipboardList,
@@ -6,7 +6,7 @@ import {
   FileSpreadsheet, Receipt, Search,
 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
-import { DocumentTemplate } from "../documents/DocumentTemplate";
+import { DocumentTemplate, sanitizeDocumentImageUrl } from "../documents/DocumentTemplate";
 import type { DocumentData } from "../documents/DocumentTemplate";
 import { getPurchaseOrders } from "../../data/purchaseOrdersData";
 
@@ -227,6 +227,67 @@ const fmt = (n: number) => n.toLocaleString("fr-FR") + " FCFA";
 
 // ─── Map raw data → DocumentData ──────────────────────────────────────────────
 
+function getCustomerForDocument(item: any, customers: any[]) {
+  const detail = item?.customer_detail ?? item?.customer;
+  const customerId = detail && typeof detail === "object"
+    ? detail.id
+    : detail;
+  const matchedCustomer = customerId == null
+    ? undefined
+    : customers.find((customer) => String(customer.id) === String(customerId));
+
+  return matchedCustomer ?? (detail && typeof detail === "object" ? detail : null);
+}
+
+function getSupplierForDocument(item: any, suppliers: any[]) {
+  const detail = item?.supplier_detail ?? item?.supplier;
+  const detailId = detail && typeof detail === "object"
+    ? detail.id
+    : detail;
+  const supplierReference = item?.supplier;
+  const supplierId = detailId ?? (
+    supplierReference && typeof supplierReference === "object"
+      ? supplierReference.id
+      : supplierReference
+  );
+  const matchedSupplier = supplierId == null
+    ? undefined
+    : suppliers.find((supplier) => String(supplier.id) === String(supplierId));
+
+  if (matchedSupplier) {
+    const detailData = detail && typeof detail === "object" ? detail : {};
+    return {
+      ...detailData,
+      ...matchedSupplier,
+      logo: matchedSupplier.logo || detailData.logo || null,
+      address: matchedSupplier.address || detailData.address || detailData.adresse || "",
+      phone: matchedSupplier.phone || detailData.phone || detailData.telephone || "",
+      email: matchedSupplier.email || detailData.email || "",
+    };
+  }
+
+  return detail && typeof detail === "object" ? detail : null;
+}
+
+function resolveDocumentAssetUrl(path: string) {
+  try {
+    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+    return new URL(path, apiUrl || window.location.origin).toString();
+  } catch {
+    return path;
+  }
+}
+
+function getHeaderInfo(entity: any) {
+  return {
+    headerName: entity?.raison_sociale || entity?.name || "",
+    headerAddress: entity?.address || entity?.adresse || "",
+    headerPhone: entity?.phone || entity?.telephone || "",
+    headerEmail: entity?.email || "",
+    headerLogo: entity?.logo ? resolveDocumentAssetUrl(String(entity.logo)) : null,
+  };
+}
+
 function toDocData(
   category: string,
   item: any,
@@ -283,7 +344,8 @@ companyLogo: company?.logo || null,
 
     notes: item.notes || undefined,
   };
-    case "client-orders":
+    case "client-orders": {
+  const orderCustomer = getCustomerForDocument(item, customers);
   return {
     type: "Bon de commande",
     number: item.reference || item.id,
@@ -297,6 +359,7 @@ companyAddress: company?.address || "—",
 companyPhone: company?.phone || "—",
 companyEmail: company?.email || "—",
 companyLogo: company?.logo || null,
+    ...getHeaderInfo(orderCustomer),
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -324,6 +387,7 @@ companyLogo: company?.logo || null,
 
     notes: item.notes || undefined,
   };
+  }
     case "supplier-orders":
   return {
     type: "Bon de commande",
@@ -339,6 +403,20 @@ companyAddress: company?.address || "—",
 companyPhone: company?.phone || "—",
 companyEmail: company?.email || "—",
 companyLogo: company?.logo || null,
+ ...getHeaderInfo(company),
+    headerLogo:
+      item.company_logo || company?.logo
+        ? resolveDocumentAssetUrl(
+            String(item.company_logo || company?.logo)
+          )
+        : null,
+    headerLogoDiagnostic: {
+      documentType: "BDC fournisseur",
+      sourceField: item.company_logo ? "purchaseOrder.company_logo" : "company.logo",
+      sourceValue: item.company_logo || company?.logo
+        ? String(item.company_logo || company?.logo)
+        : null,
+    },
 
     clientName: item.supplier_detail?.raison_sociale || "—",
 
@@ -374,9 +452,7 @@ companyLogo: company?.logo || null,
   };
 
     case "client-invoices": {
-  const fullCustomer = customers.find(
-    (customer) => customer.id === item.customer_detail?.id
-  );
+  const fullCustomer = getCustomerForDocument(item, customers);
 
   console.log("=== CLIENT DOCUMENT ===", {
     customerId: item.customer_detail?.id,
@@ -393,17 +469,12 @@ companyLogo: company?.logo || null,
       ? new Date(item.invoice_date).toLocaleDateString("fr-FR")
       : "—",
 
-   companyName:
-  fullCustomer?.raison_sociale || "—",
-
-companyAddress:
-  fullCustomer?.address || "—",
-
-companyPhone:
-  fullCustomer?.phone || "—",
-
-companyEmail:
-  fullCustomer?.email || "—",
+   companyName: company?.name || "",
+   companyAddress: company?.address || "",
+   companyPhone: company?.phone || "",
+   companyEmail: company?.email || "",
+   companyLogo: company?.logo || null,
+   ...getHeaderInfo(company),
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -442,10 +513,7 @@ companyEmail:
   };
   }
   case "supplier-invoices": {
-      
-  const fullSupplier = suppliers.find(
-  (supplier) => supplier.id === item.supplier_detail?.id
-);
+  const fullSupplier = getSupplierForDocument(item, suppliers);
 
   return {
     type: "Facture",
@@ -470,6 +538,12 @@ companyPhone:
 
 companyEmail:
   fullSupplier?.email || "—",
+    ...getHeaderInfo(fullSupplier),
+    headerLogoDiagnostic: {
+      documentType: "Facture fournisseur",
+      sourceField: "supplier.logo",
+      sourceValue: fullSupplier?.logo ? String(fullSupplier.logo) : null,
+    },
   clientName: "—",
 
     clientAddress: "—",
@@ -522,9 +596,7 @@ companyEmail:
   }
 
     case "supplier-deliveries": {
-  const fullSupplier = suppliers.find(
-    (supplier) => supplier.id === item.supplier_detail?.id
-  );
+  const fullSupplier = getSupplierForDocument(item, suppliers);
 
   return {
     type: "Bordereau de livraison",
@@ -546,6 +618,12 @@ companyPhone:
 
 companyEmail:
   fullSupplier?.email || "—",
+    ...getHeaderInfo(fullSupplier),
+    headerLogoDiagnostic: {
+      documentType: "BL fournisseur",
+      sourceField: "supplier.logo",
+      sourceValue: fullSupplier?.logo ? String(fullSupplier.logo) : null,
+    },
 
     clientName:
       item.supplier_detail?.raison_sociale || "—",
@@ -609,9 +687,7 @@ total: (item.items || []).reduce((sum: number, i: any) => {
   }
 
     case "client-deliveries": {
-  const fullCustomer = customers.find(
-    (customer) => customer.id === item.customer_detail?.id
-  );
+  const fullCustomer = getCustomerForDocument(item, customers);
 
   return {
     type: "Bordereau de livraison",
@@ -622,17 +698,12 @@ total: (item.items || []).reduce((sum: number, i: any) => {
       ? new Date(item.delivery_date).toLocaleDateString("fr-FR")
       : "—",
 
-    companyName:
-  fullCustomer?.raison_sociale || "—",
-
-companyAddress:
-  fullCustomer?.address || "—",
-
-companyPhone:
-  fullCustomer?.phone || "—",
-
-companyEmail:
-  fullCustomer?.email || "—",
+    companyName: company?.name || "",
+    companyAddress: company?.address || "",
+    companyPhone: company?.phone || "",
+    companyEmail: company?.email || "",
+    companyLogo: company?.logo || null,
+    ...getHeaderInfo(company),
 
     clientName: item.customer_detail?.raison_sociale || "—",
 
@@ -861,29 +932,59 @@ export function DocumentGenerator() {
   const [company, setCompany] = useState<any>(null);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const requestedSupplierIds = useRef(new Set<string>());
   useEffect(() => {
   const loadCurrentUser = async () => {
     try {
       const response = await apiRequest("/v1/users/me/");
+      const linkedCompany = response?.company ?? null;
+      const linkedCompanyId =
+        linkedCompany && typeof linkedCompany === "object"
+          ? linkedCompany.id
+          : linkedCompany;
 
-console.log(
-  "=== ENTREPRISE CONNECTÉE POUR DOCUMENT ===",
-  JSON.stringify(response?.company, null, 2)
-);
+console.log("=== ENTREPRISE CONNECTÉE POUR DOCUMENT ===", {
+  id: linkedCompanyId ?? null,
+  logoPresent: Boolean(
+    linkedCompany && typeof linkedCompany === "object" && linkedCompany.logo
+  ),
+});
 
-const companyData = response?.company
-  ? {
-      ...response.company,
-      logo: response.company.logo
-        ? new URL(
-            response.company.logo,
-            "https://api.bbcons.net"
-          ).toString()
-        : null,
-    }
-  : null;
+      let companyData =
+        linkedCompany && typeof linkedCompany === "object"
+          ? linkedCompany
+          : null;
+      if (linkedCompanyId) {
+        try {
+          const companyDetail = await apiRequest(
+            `/v1/companies/${encodeURIComponent(String(linkedCompanyId))}/`
+          );
+          companyData = {
+            ...(linkedCompany && typeof linkedCompany === "object"
+              ? linkedCompany
+              : {}),
+            ...companyDetail,
+            name: companyDetail?.name || linkedCompany?.name || "",
+            address: companyDetail?.address || linkedCompany?.address || "",
+            phone: companyDetail?.phone || linkedCompany?.phone || "",
+            email: companyDetail?.email || linkedCompany?.email || "",
+            logo: companyDetail?.logo || linkedCompany?.logo || null,
+          };
+        } catch (error) {
+          console.error("Erreur récupération du détail de l'entreprise :", error);
+        }
+      }
 
-setCompany(companyData);
+      setCompany(
+        companyData
+          ? {
+              ...companyData,
+              logo: companyData.logo
+                ? resolveDocumentAssetUrl(String(companyData.logo))
+                : null,
+            }
+          : null
+      );
     } catch (error) {
       console.error("Erreur récupération entreprise :", error);
     }
@@ -896,10 +997,9 @@ useEffect(() => {
   const loadSuppliers = async () => {
     try {
       const response = await apiRequest("/v1/suppliers/");
-
-     
-
-      setSuppliers(response?.results || []);
+      setSuppliers(
+        Array.isArray(response) ? response : response?.results || []
+      );
     } catch (error) {
       console.error("Erreur récupération fournisseurs :", error);
     }
@@ -1228,6 +1328,56 @@ const selectedRaw = selectedId
       djangoSupplierDeliveries
     )
   : null;
+
+useEffect(() => {
+    if (
+      !selectedRaw ||
+      (activeCategory !== "supplier-orders" &&
+        activeCategory !== "supplier-deliveries" &&
+        activeCategory !== "supplier-invoices")
+    ) {
+      return;
+    }
+
+    const supplierDetail = selectedRaw.supplier_detail;
+    const supplierReference = selectedRaw.supplier;
+    const supplierId =
+      (supplierDetail && typeof supplierDetail === "object"
+        ? supplierDetail.id
+        : null) ??
+      (supplierReference && typeof supplierReference === "object"
+        ? supplierReference.id
+        : supplierReference);
+    if (supplierId == null) return;
+
+    const normalizedId = String(supplierId);
+    const listedSupplier = suppliers.find(
+      (entry) => String(entry.id) === normalizedId
+    );
+    if (
+      listedSupplier?.logo ||
+      (supplierDetail && typeof supplierDetail === "object" && supplierDetail.logo)
+    ) {
+      return;
+    }
+    if (requestedSupplierIds.current.has(normalizedId)) return;
+
+    requestedSupplierIds.current.add(normalizedId);
+    apiRequest(`/v1/suppliers/${encodeURIComponent(normalizedId)}/`)
+      .then((supplierDetail) => {
+        if (!supplierDetail?.id) {
+          throw new Error(`Fiche fournisseur introuvable pour ${normalizedId}`);
+        }
+        setSuppliers((current) => [
+          ...current.filter((entry) => String(entry.id) !== normalizedId),
+          supplierDetail,
+        ]);
+      })
+      .catch((error) => {
+        console.error("Erreur récupération du fournisseur du document :", error);
+      });
+}, [activeCategory, selectedRaw, suppliers]);
+
  const selectedDocData: DocumentData | null = selectedRaw
  ? toDocData(
     activeCategory,
@@ -1239,7 +1389,7 @@ const selectedRaw = selectedId
   : null;
 
   // ── PDF print handler ────────────────────────────────────────────────────────
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     const el = document.getElementById("document-content");
     if (!el) return;
     const win = window.open("", "", "width=900,height=750");
@@ -1252,7 +1402,19 @@ const selectedRaw = selectedId
       </style></head><body>${el.innerHTML}</body></html>`
     );
     win.document.close();
-    setTimeout(() => { win.print(); win.close(); }, 400);
+    await Promise.all(
+      Array.from(win.document.images, (image) =>
+        image.decode().catch((error) => {
+          console.error(
+            "Erreur chargement d'une image du document :",
+            sanitizeDocumentImageUrl(image.src),
+            error
+          );
+        })
+      )
+    );
+    win.print();
+    win.close();
   };
 
   // ─────────────────────────────────────────────────────────────────────────

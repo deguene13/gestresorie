@@ -218,13 +218,32 @@ function makeDocument(
   ].filter(Boolean).join(" — ");
 
   const partyIsHeader = kind === "invoice" || isDelivery;
-  const header = partyIsHeader ? party : company;
+  const header = partyType === "customer"
+    ? (kind === "order" ? party : company)
+    : (partyIsHeader ? party : company);
   const recipient = partyIsHeader ? company : party;
   const recipientLabel = partyIsHeader
     ? (kind === "invoice"
       ? (partyType === "customer" ? "Émetteur / destinataire" : "Fournisseur")
       : (partyType === "customer" ? "Client destinataire" : "Fournisseur"))
     : (partyType === "customer" ? "Client" : "Fournisseur");
+  const isSupplierOrder = kind === "order" && partyType === "supplier";
+  const companyLogo = isSupplierOrder
+    ? record.company_logo || company?.logo
+    : company?.logo;
+  const supplierLogo = isSupplierOrder
+    ? record.supplier_logo || record.supplier_detail?.logo
+    : null;
+  const isSupplierHeaderDocument = partyType === "supplier" && partyIsHeader;
+  const supplierHeaderLogo = isSupplierHeaderDocument
+    ? record.supplier_logo || record.supplier_detail?.logo || party?.logo
+    : null;
+  const supplierLogoSourceField: NonNullable<DocumentData["headerLogoDiagnostic"]>["sourceField"] =
+    record.supplier_logo
+      ? isDelivery ? "delivery.supplier_logo" : "invoice.supplier_logo"
+      : record.supplier_detail?.logo
+        ? isDelivery ? "delivery.supplier_detail.logo" : "invoice.supplier_detail.logo"
+        : "supplier.logo";
 
   return {
     type: documentType,
@@ -239,7 +258,26 @@ function makeDocument(
     headerAddress: header?.address || "",
     headerPhone: header?.phone || "",
     headerEmail: header?.email || "",
-    headerLogo: header?.logo ? resolveAssetUrl(String(header.logo)) : null,
+    headerLogo: isSupplierOrder
+      ? companyLogo ? resolveAssetUrl(String(companyLogo)) : null
+      : isSupplierHeaderDocument
+        ? supplierHeaderLogo ? resolveAssetUrl(String(supplierHeaderLogo)) : null
+      : partyType === "customer" && header?.logo
+        ? resolveAssetUrl(String(header.logo))
+        : null,
+    headerLogoDiagnostic: isSupplierOrder
+      ? {
+          documentType: "BDC fournisseur",
+          sourceField: record.company_logo ? "purchaseOrder.company_logo" : "company.logo",
+          sourceValue: companyLogo ? String(companyLogo) : null,
+        }
+      : isSupplierHeaderDocument
+        ? {
+            documentType: isDelivery ? "BL fournisseur" : "Facture fournisseur",
+            sourceField: supplierLogoSourceField,
+            sourceValue: supplierHeaderLogo ? String(supplierHeaderLogo) : null,
+          }
+        : undefined,
     clientName: recipient?.raison_sociale || recipient?.name || "",
     clientAddress: recipient?.address || "",
     clientPhone: recipient?.phone || "",
@@ -249,6 +287,14 @@ function makeDocument(
     recipientAddress: recipient?.address || "",
     recipientPhone: recipient?.phone || "",
     recipientEmail: recipient?.email || "",
+    recipientLogo: null,
+    recipientLogoDiagnostic: isSupplierOrder ? {
+      documentType: "BDC fournisseur",
+      sourceField: record.supplier_logo
+        ? "purchaseOrder.supplier_logo"
+        : "purchaseOrder.supplier_detail.logo",
+      sourceValue: supplierLogo ? String(supplierLogo) : null,
+    } : undefined,
     items,
     subtotal,
     tvaRate: taxRate,

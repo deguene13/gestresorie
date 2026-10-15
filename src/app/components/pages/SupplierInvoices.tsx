@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, Upload, Eye, CheckCircle, XCircle, Trash2, X, FileText, UserCheck, Download, Printer, ArrowLeft, Plus, Lock, Unlock } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAppData } from "../../context/AppDataContext";
 import { useAuth } from "../../context/AuthContext";
-import { DocumentTemplate } from "../documents/DocumentTemplate";
+import {
+  DocumentTemplate,
+  sanitizeDocumentImageUrl,
+} from "../documents/DocumentTemplate";
 import { RejectModal } from "../shared/RejectModal";
 import { apiRequest } from "../../apiClient";
 import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
@@ -29,11 +32,15 @@ type Invoice = {
   invoice_number: string;
 
   supplier: string;
+  supplier_id?: string;
   supplier_detail?: {
     id: string;
     raison_sociale: string;
     ninea?: string;
     email?: string;
+    address?: string;
+    phone?: string;
+    logo?: string | null;
   } | null;
 
   purchase_order?: string | null;
@@ -215,6 +222,14 @@ const getDueDateStatus = (dueDate: string, isPaid: boolean) => {
   return { color: "bg-gray-300", label: "À venir", textColor: "text-gray-500" };
 };
 
+function resolveDocumentAssetUrl(path: string) {
+  try {
+    return new URL(path, import.meta.env.VITE_API_URL || window.location.origin).toString();
+  } catch {
+    return path;
+  }
+}
+
 export function SupplierInvoices() {
   const { lang, t } = useLanguage();
   const { autoInvoices, updateInvoiceStatus, addNotification } = useAppData();
@@ -258,7 +273,9 @@ const isViewOnly =
   const [currentPage, setCurrentPage] = useState(1);
 const [totalPages, setTotalPages] = useState(1);
   const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [validatedDeliveries, setValidatedDeliveries] = useState<any[]>([]);
+const [documentSupplierDetail, setDocumentSupplierDetail] = useState<any>(null);
+const requestedDocumentSupplierIds = useRef(new Set<string>());
+const [validatedDeliveries, setValidatedDeliveries] = useState<any[]>([]);
   const [invoicedDeliveryIds, setInvoicedDeliveryIds] = useState<string[]>([]);
 const mapDjangoInvoice = (invoice: any): Invoice => {
   console.log("=== DONNÉES REJET FACTURE DJANGO ===", {
@@ -278,6 +295,9 @@ const mapDjangoInvoice = (invoice: any): Invoice => {
       invoice.supplier ||
       "—",
 
+    supplier_id:
+      invoice.supplier_detail?.id ||
+      (typeof invoice.supplier === "string" ? invoice.supplier : undefined),
     supplier_detail: invoice.supplier_detail,
 
     purchase_order: invoice.purchase_order,
@@ -527,6 +547,31 @@ useEffect(() => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDocumentPreview, setShowDocumentPreview] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  useEffect(() => {
+    const invoiceSupplierId =
+      selectedInvoice?.supplier_detail?.id ?? selectedInvoice?.supplier_id;
+    if (!showDocumentPreview || !invoiceSupplierId || invoiceSupplierId === "—") return;
+
+    const supplierId = String(invoiceSupplierId);
+    const listedSupplier = suppliers.find(
+      (supplier) => String(supplier.id) === supplierId
+    );
+    if (listedSupplier?.logo || selectedInvoice.supplier_detail.logo) return;
+    if (requestedDocumentSupplierIds.current.has(supplierId)) return;
+
+    requestedDocumentSupplierIds.current.add(supplierId);
+    apiRequest(`/v1/suppliers/${encodeURIComponent(supplierId)}/`)
+      .then((supplierDetail) => {
+        if (!supplierDetail?.id) {
+          throw new Error(`Fiche fournisseur introuvable pour ${supplierId}`);
+        }
+        setDocumentSupplierDetail(supplierDetail);
+      })
+      .catch((error) => {
+        console.error("Erreur récupération du fournisseur de la facture :", error);
+      });
+  }, [selectedInvoice, showDocumentPreview, suppliers]);
 
   // Rejection modal state
   const [rejectModal, setRejectModal] = useState<{ invoiceId: string; ref: string } | null>(null);
@@ -1014,20 +1059,61 @@ setInvoices(refreshedInvoices);
     setShowDocumentPreview(true);
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     const printContent = document.getElementById("document-content");
     if (!printContent) return;
     const printWindow = window.open("", "", "width=800,height=600");
     if (!printWindow) return;
     printWindow.document.write(`<html><head><title>Facture Fournisseur - ${selectedInvoice?.id}</title><style>body{margin:0;padding:0;font-family:Arial,sans-serif;}@media print{@page{size:A4;margin:0;}}</style></head><body>${printContent.innerHTML}</body></html>`);
     printWindow.document.close();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+    await Promise.all(
+      Array.from(printWindow.document.images, (image) =>
+        image.decode().catch((error) => {
+          console.error(
+            "Erreur chargement d'une image de la facture :",
+            sanitizeDocumentImageUrl(image.src),
+            error
+          );
+        })
+      )
+    );
+    printWindow.print();
+    printWindow.close();
   };
 
   const handlePrint = () => { window.print(); };
 
   const getDocumentData = () => {
   if (!selectedInvoice) return null;
+
+  const supplierId = selectedInvoice.supplier_id ?? selectedInvoice.supplier_detail?.id;
+  const matchedSupplier =
+    documentSupplierDetail?.id != null &&
+    String(documentSupplierDetail.id) === String(supplierId)
+      ? documentSupplierDetail
+      : suppliers.find(
+          (supplier) =>
+            supplierId != null && String(supplier.id) === String(supplierId)
+        );
+  const invoiceSupplier = matchedSupplier
+    ? {
+        ...selectedInvoice.supplier_detail,
+        ...matchedSupplier,
+        logo: matchedSupplier.logo || selectedInvoice.supplier_detail?.logo || null,
+        address:
+          matchedSupplier.address ||
+          selectedInvoice.supplier_detail?.address ||
+          "",
+        phone:
+          matchedSupplier.phone ||
+          selectedInvoice.supplier_detail?.phone ||
+          "",
+        email:
+          matchedSupplier.email ||
+          selectedInvoice.supplier_detail?.email ||
+          "",
+      }
+    : selectedInvoice.supplier_detail;
 
   // Conversion des lignes Django vers le format
   // attendu par DocumentTemplate
@@ -1069,10 +1155,22 @@ return {
 
   date: selectedInvoice.invoice_date,
 
-  companyName: "",
-  companyAddress: "",
-  companyPhone: "",
-  companyEmail: "",
+  companyName: invoiceSupplier?.raison_sociale || selectedInvoice.supplier || "",
+  companyAddress: invoiceSupplier?.address || "",
+  companyPhone: invoiceSupplier?.phone || "",
+  companyEmail: invoiceSupplier?.email || "",
+  headerName: invoiceSupplier?.raison_sociale || selectedInvoice.supplier || "",
+  headerAddress: invoiceSupplier?.address || "",
+  headerPhone: invoiceSupplier?.phone || "",
+  headerEmail: invoiceSupplier?.email || "",
+  headerLogo: invoiceSupplier?.logo
+    ? resolveDocumentAssetUrl(String(invoiceSupplier.logo))
+    : null,
+  headerLogoDiagnostic: {
+    documentType: "Facture fournisseur" as const,
+    sourceField: "supplier.logo" as const,
+    sourceValue: invoiceSupplier?.logo ? String(invoiceSupplier.logo) : null,
+  },
 
   clientName: selectedInvoice.supplier,
 

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Download, Printer, ArrowLeft } from "lucide-react";
 
 export type DocumentItem = {
@@ -23,6 +24,23 @@ export type DocumentData = {
   headerPhone?: string;
   headerEmail?: string;
   headerLogo?: string | null;
+  headerLogoDiagnostic?: {
+    documentType: "BDC fournisseur" | "BL fournisseur" | "Facture fournisseur";
+    sourceField:
+      | "company.logo"
+      | "purchaseOrder.company_logo"
+      | "supplier.logo"
+      | "delivery.supplier_logo"
+      | "delivery.supplier_detail.logo"
+      | "invoice.supplier_logo"
+      | "invoice.supplier_detail.logo";
+    sourceValue: string | null;
+  };
+  recipientLogoDiagnostic?: {
+    documentType: "BDC fournisseur";
+    sourceField: "purchaseOrder.supplier_logo" | "purchaseOrder.supplier_detail.logo";
+    sourceValue: string | null;
+  };
 
   // Informations du client
   clientName: string;
@@ -55,6 +73,19 @@ type Props = {
   contentId?: string;
 };
 
+export function sanitizeDocumentImageUrl(value: string | null | undefined) {
+  if (!value) return null;
+  if (value.startsWith("data:")) {
+    return `${value.slice(0, value.indexOf(",") + 1)}[redacted]`;
+  }
+  try {
+    const url = new URL(value, window.location.origin);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return value.split(/[?#]/, 1)[0];
+  }
+}
+
 export function DocumentTemplate({ data, onDownload, onPrint, onBack, showActions = true, contentId = "document-content" }: Props) {
   const headerName = data.headerName ?? data.companyName;
   const headerAddress = data.headerAddress ?? data.companyAddress;
@@ -64,6 +95,40 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
   const recipientAddress = data.recipientAddress ?? data.clientAddress;
   const recipientPhone = data.recipientPhone ?? data.clientPhone;
   const recipientEmail = data.recipientEmail;
+
+  useEffect(() => {
+    if (!data.headerLogoDiagnostic) return;
+    console.info("[document-logo diagnostic]", {
+      documentType: data.headerLogoDiagnostic.documentType,
+      sourceField: data.headerLogoDiagnostic.sourceField,
+      sourcePresent: Boolean(data.headerLogoDiagnostic.sourceValue),
+      sourceValue: sanitizeDocumentImageUrl(data.headerLogoDiagnostic.sourceValue),
+      transmittedHeaderLogo: sanitizeDocumentImageUrl(data.headerLogo),
+      transmitted: Boolean(data.headerLogo),
+    });
+  }, [
+    data.headerLogo,
+    data.headerLogoDiagnostic?.documentType,
+    data.headerLogoDiagnostic?.sourceField,
+    data.headerLogoDiagnostic?.sourceValue,
+  ]);
+
+  useEffect(() => {
+    if (!data.recipientLogoDiagnostic) return;
+    console.info("[document-logo diagnostic]", {
+      documentType: data.recipientLogoDiagnostic.documentType,
+      sourceField: data.recipientLogoDiagnostic.sourceField,
+      sourcePresent: Boolean(data.recipientLogoDiagnostic.sourceValue),
+      sourceValue: sanitizeDocumentImageUrl(data.recipientLogoDiagnostic.sourceValue),
+      transmittedRecipientLogo: sanitizeDocumentImageUrl(data.recipientLogo),
+      transmitted: Boolean(data.recipientLogo),
+    });
+  }, [
+    data.recipientLogo,
+    data.recipientLogoDiagnostic?.documentType,
+    data.recipientLogoDiagnostic?.sourceField,
+    data.recipientLogoDiagnostic?.sourceValue,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -86,7 +151,31 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
           {/* Company Info */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-16 w-16 flex-shrink-0" aria-hidden="true" />
+              {data.headerLogo ? (
+                <img
+                  src={data.headerLogo}
+                  alt={headerName ? `Logo ${headerName}` : "Logo"}
+                  className="h-16 w-16 flex-shrink-0 object-contain"
+                  onLoad={() => {
+                    if (data.headerLogoDiagnostic) {
+                      console.info("[document-logo loaded]", {
+                        documentType: data.headerLogoDiagnostic.documentType,
+                        src: sanitizeDocumentImageUrl(data.headerLogo),
+                      });
+                    }
+                  }}
+                  onError={() => {
+                    if (data.headerLogoDiagnostic) {
+                      console.error("[document-logo load failed]", {
+                        documentType: data.headerLogoDiagnostic.documentType,
+                        src: sanitizeDocumentImageUrl(data.headerLogo),
+                      });
+                    }
+                  }}
+                />
+              ) : (
+                <div className="h-16 w-16 flex-shrink-0" aria-hidden="true" />
+              )}
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                     {headerName}
@@ -143,6 +232,26 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
                  ? "Fournisseur"
                : "Client")}
             </h3>
+         <div className="flex items-start gap-3">
+         {data.recipientLogoDiagnostic && data.recipientLogo && (
+           <img
+             src={data.recipientLogo}
+             alt={recipientName ? `Logo ${recipientName}` : "Logo fournisseur"}
+             className="h-16 w-16 flex-shrink-0 object-contain"
+             onLoad={() => {
+               console.info("[document-recipient-logo loaded]", {
+                 documentType: data.recipientLogoDiagnostic?.documentType,
+                 src: sanitizeDocumentImageUrl(data.recipientLogo),
+               });
+             }}
+             onError={() => {
+               console.error("[document-recipient-logo load failed]", {
+                 documentType: data.recipientLogoDiagnostic?.documentType,
+                 src: sanitizeDocumentImageUrl(data.recipientLogo),
+               });
+             }}
+           />
+         )}
          <div className="text-sm text-gray-700 space-y-1">
   <p className="font-semibold">{recipientName}</p>
 
@@ -152,6 +261,7 @@ export function DocumentTemplate({ data, onDownload, onPrint, onBack, showAction
 
   {recipientEmail && <p>Email : {recipientEmail}</p>}
 </div>
+         </div>
         </div>
 
         {/* Items Table */}

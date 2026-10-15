@@ -48,6 +48,15 @@ const emptyForm: FormState = {
   payment_terms: 30,
 };
 
+function resolveLogoUrl(logo: string) {
+  try {
+    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+    return new URL(logo, apiUrl || window.location.origin).toString();
+  } catch {
+    return logo;
+  }
+}
+
 export function ClientManagement() {
   const { hasRole } = useAuth();
   const { addNotification } = useAppData();
@@ -543,7 +552,17 @@ const handleViewCustomer = async (customer: Customer) => {
         {/* NOM / RAISON SOCIALE */}
 <td className="p-3">
   <div className="flex items-center gap-3">
-    <div className="h-10 w-10 flex-shrink-0" aria-hidden="true" />
+    {client.logo ? (
+      <img
+        src={resolveLogoUrl(client.logo)}
+        alt={`Logo ${client.raison_sociale}`}
+        className="h-10 w-10 object-contain border border-gray-200 rounded-lg p-1 bg-white"
+      />
+    ) : (
+      <div className="h-10 w-10 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-[10px] text-gray-400">
+        Logo
+      </div>
+    )}
 
     <span>{client.raison_sociale}</span>
   </div>
@@ -859,7 +878,17 @@ const handleViewCustomer = async (customer: Customer) => {
             <div className="p-5">
 
               <div className="flex items-center gap-4 mb-6">
-                <div className="h-20 w-20 flex-shrink-0" aria-hidden="true" />
+                {selectedCustomer.logo ? (
+                  <img
+                    src={resolveLogoUrl(selectedCustomer.logo)}
+                    alt={`Logo ${selectedCustomer.raison_sociale}`}
+                    className="h-20 w-20 object-contain border border-gray-200 rounded-lg p-1 bg-white"
+                  />
+                ) : (
+                  <div className="h-20 w-20 flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 text-xs text-gray-400">
+                    Logo
+                  </div>
+                )}
 
                 <div>
                   <p className="text-lg font-semibold text-gray-900">
