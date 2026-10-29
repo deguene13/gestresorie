@@ -22,6 +22,8 @@ import {
   createCustomerDelivery,
   rejectCustomerDelivery,
   validateCustomerDelivery,
+   updateCustomerDelivery,
+  patchCustomerDelivery,
 } from "../../data/customerDeliveriesData";
 import { getCustomerOrders } from "../../data/customerOrdersData";
 import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
@@ -108,6 +110,11 @@ export function ClientDeliveries() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState("");
+  
+const [editingDelivery, setEditingDelivery] = useState<any | null>(null);
+const [editMode, setEditMode] = useState<"PUT" | "PATCH">("PUT");
+const [editItems, setEditItems] = useState<any[]>([]);
+
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [documentMessage, setDocumentMessage] = useState("");
@@ -327,6 +334,72 @@ export function ClientDeliveries() {
 
 
   };
+  
+const handleUpdateDelivery = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (!editingDelivery) return;
+
+  try {
+    const fullPayload = {
+      delivery_date: formData.deliveryDate,
+      customer_delivery_note:
+        editingDelivery.customer_delivery_note || "",
+      notes: formData.notes,
+     items: editItems.map((item: any) => ({
+  ...(item.id ? { id: item.id } : {}),
+  product: item.product,
+  quantity_delivered: String(item.quantity_delivered ?? 0),
+})),
+    };
+
+    const payload =
+      editMode === "PUT"
+        ? fullPayload
+       : {
+    ...(formData.deliveryDate !== editingDelivery.delivery_date
+      ? { delivery_date: formData.deliveryDate }
+      : {}),
+    ...(formData.notes !== (editingDelivery.notes || "")
+      ? { notes: formData.notes }
+      : {}),
+    items: editItems.map((item: any) => ({
+      ...(item.id ? { id: item.id } : {}),
+      product: item.product,
+      quantity_delivered: String(item.quantity_delivered ?? 0),
+    })),
+  };
+
+    const response =
+      editMode === "PUT"
+        ? await updateCustomerDelivery(editingDelivery.id, fullPayload)
+        : await patchCustomerDelivery(editingDelivery.id, payload);
+
+    setDeliveries((prev) =>
+      prev.map((delivery) =>
+        delivery.id === editingDelivery.id
+          ? { ...delivery, ...response }
+          : delivery
+      )
+    );
+
+    setSelectedDelivery((prev) =>
+      prev?.id === editingDelivery.id
+        ? { ...prev, ...response }
+        : prev
+    );
+
+    setEditingDelivery(null);
+    setShowModal(false);
+    resetForm();
+  } catch (error) {
+    console.error(
+      "=== ERREUR MODIFICATION LIVRAISON CLIENT ===",
+      error
+    );
+  }
+};
+
 
   const resetForm = () => {
     setFormData({
@@ -339,6 +412,28 @@ export function ClientDeliveries() {
 
     setFormItems([emptyItem()]);
   };
+  
+const handleEditDelivery = (delivery: any) => {
+  setEditingDelivery(delivery);
+  setEditItems(
+  (delivery.items || []).map((item: any) => ({
+    ...item,
+    quantity_delivered: Number(item.quantity_delivered ?? 0),
+  }))
+);
+  setEditMode("PUT");
+
+  setFormData({
+    devisRef: delivery.order_reference || "",
+    client: delivery.customer_detail?.raison_sociale || "",
+    clientAddress: delivery.customer_detail?.address || "",
+    deliveryDate: delivery.delivery_date || "",
+    notes: delivery.notes || "",
+  });
+
+  setShowModal(true);
+};
+
 
   const handleDelete = (id: string) => {
     if (
@@ -535,7 +630,15 @@ export function ClientDeliveries() {
 
         {canCreate && (
           <button
-            onClick={() => setShowModal(true)}
+           onClick={() => {
+  setEditingDelivery(null);
+  setEditMode("PUT");
+  resetForm();
+  setSelectedOrderId("");
+  setSelectedOrder(null);
+  setDocumentMessage("");
+  setShowModal(true);
+}}
             className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition"
           >
             <Plus className="w-5 h-5 mr-2" />
@@ -719,6 +822,19 @@ export function ClientDeliveries() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <RowActionMenu>
                           <RowActionItem icon={<Eye />} onSelect={() => { setSelectedDelivery(delivery); setShowDetailModal(true); }}>Voir détails</RowActionItem>
+                          
+{canEdit &&
+  delivery.status !== "VALIDATED" &&
+  delivery.status !== "REJECTED" &&
+  delivery.status !== "CANCELLED" && (
+    <RowActionItem
+      icon={<Package />}
+      onSelect={() => handleEditDelivery(delivery)}
+    >
+      Modifier
+    </RowActionItem>
+  )}
+
                           {canValidate && delivery.status !== "VALIDATED" && delivery.status !== "REJECTED" && <RowActionItem icon={<CheckCircle />} onSelect={() => handleValidate(delivery)}>Valider le bon de livraison</RowActionItem>}
                           {canValidate && delivery.status !== "VALIDATED" && delivery.status !== "REJECTED" && <RowActionItem icon={<XCircle />} onSelect={() => handleReject(delivery.id, delivery.reference)} destructive>Rejeter</RowActionItem>}
                           {canDelete && <RowActionItem icon={<Trash2 />} onSelect={() => handleDelete(delivery.id)} destructive>Supprimer</RowActionItem>}
@@ -760,7 +876,9 @@ export function ClientDeliveries() {
           <div className="bg-white rounded-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl text-gray-900">
-                Nouveau bon de livraison client
+               {editingDelivery
+  ? `Modifier le bon de livraison ${editingDelivery.reference}`
+  : "Nouveau bon de livraison client"}
               </h2>
 
               <button
@@ -773,26 +891,27 @@ export function ClientDeliveries() {
               </button>
             </div>
 
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-5"
-            >
+            
+<form
+  onSubmit={editingDelivery ? handleUpdateDelivery : handleSubmit}
+  className="space-y-5"
+>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-700 mb-2">
-                    BDC client confirmé *
-                  </label>
+                 <label className="block text-sm text-gray-700 mb-2">
+  BDC client confirmé *
+</label>
 
-                  <select
-                    value={selectedOrderId}
-                    onChange={(e) =>
-                      handleOrderChange(
-                        e.target.value
-                      )
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    required
-                  >
+                 
+<select
+  value={selectedOrderId}
+  onChange={(e) => handleOrderChange(e.target.value)}
+  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+  required
+  disabled={!!editingDelivery}
+>
+
                     <option value="">
                       Sélectionner un BDC
                     </option>
@@ -812,13 +931,14 @@ export function ClientDeliveries() {
                       )
                     )}
                   </select>
-                  {documentMessage && (
+                  
+                  {!editingDelivery && documentMessage && (
                     <p className="mt-2 text-sm font-medium text-red-600">
                        {documentMessage}
                     </p>
           )}
 
-                  {selectedOrder && (
+                  {!editingDelivery && selectedOrder && (
                     <div className="mt-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
                       <h4 className="font-medium text-gray-800 mb-3">
                         Articles du BDC
@@ -932,11 +1052,110 @@ export function ClientDeliveries() {
                   </label>
                 </div>
 
-                {!selectedOrder ? (
-                  <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-500">
-                    Sélectionnez d'abord un BDC client confirmé.
-                  </div>
-                ) : (
+               {editingDelivery ? (
+  <div className="space-y-2">
+    {editItems.map((item: any, index: number) => (
+      <div
+        key={item.id ?? index}
+        className="grid grid-cols-12 gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50"
+      >
+        <div className="col-span-4">
+          <label className="block text-xs text-gray-500 mb-1">
+            PRODUIT
+          </label>
+          <input
+            type="text"
+            value={item.product_detail?.name || item.product_name || ""}
+            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+            readOnly
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">
+            COMMANDÉ
+          </label>
+          <input
+            type="number"
+            value={Number(item.quantity_ordered ?? item.quantity ?? 0)}
+            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+            readOnly
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">
+            LIVRÉ
+          </label>
+         <input
+  type="number"
+  min="0"
+  max={Number(item.quantity_ordered ?? item.quantity ?? 0)}
+  value={Number(item.quantity_delivered ?? 0)}
+  onChange={(e) => {
+    const value = e.target.value;
+    const maxQuantity = Number(
+      item.quantity_ordered ?? item.quantity ?? 0
+    );
+
+    if (value === "") {
+      setEditItems((prev) =>
+        prev.map((current, i) =>
+          i === index
+            ? { ...current, quantity_delivered: "" }
+            : current
+        )
+      );
+      return;
+    }
+
+    const quantity = Number(value);
+
+    if (quantity >= 0 && quantity <= maxQuantity) {
+      setEditItems((prev) =>
+        prev.map((current, i) =>
+          i === index
+            ? { ...current, quantity_delivered: quantity }
+            : current
+        )
+      );
+    }
+  }}
+  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+/>
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">
+            UNITÉ
+          </label>
+          <input
+            type="text"
+            value={item.product_detail?.unit || item.unit || ""}
+            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+            readOnly
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">
+            PRIX HT
+          </label>
+          <input
+            type="number"
+            value={Number(item.unit_price ?? 0)}
+            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+            readOnly
+          />
+        </div>
+      </div>
+    ))}
+  </div>
+) : !selectedOrder ? (
+  <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-500">
+    Sélectionnez d'abord un BDC client confirmé.
+  </div>
+) : (
                   <div className="space-y-2">
                     {selectedOrder.items?.map(
                       (item: any) => (
@@ -1045,6 +1264,24 @@ export function ClientDeliveries() {
                   placeholder="Instructions de livraison, observations..."
                 />
               </div>
+              {editingDelivery && (
+  <div>
+    <label className="block text-sm text-gray-700 mb-2">
+      Mode de modification
+    </label>
+
+    <select
+      value={editMode}
+      onChange={(e) =>
+        setEditMode(e.target.value as "PUT" | "PATCH")
+      }
+      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+    >
+      <option value="PUT">PUT — Remplacement complet</option>
+      <option value="PATCH">PATCH — Modification partielle</option>
+    </select>
+  </div>
+)}
 
               <div className="flex gap-3 pt-2">
                 <button
@@ -1062,7 +1299,7 @@ export function ClientDeliveries() {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition"
                 >
-                  Créer le BL
+                  {editingDelivery ? "Enregistrer les modifications" : "Créer le BL"}
                 </button>
               </div>
             </form>

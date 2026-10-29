@@ -93,3 +93,23 @@ export async function sendCustomerQuoteToCustomer(
     }
   );
 }
+
+export async function submitCustomerQuoteToPurchasing(id: string) {
+  return await apiRequest(
+    `/v1/quotes/customer/${id}/submit-to-purchasing/`,
+    { method: "POST" }
+  );
+}
+
+export async function reviewCustomerQuoteAvailability(
+  id: string,
+  items: { id: string; available: boolean; note: string }[]
+) {
+  return await apiRequest(
+    `/v1/quotes/customer/${id}/review-availability/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ items }),
+    }
+  );
+}

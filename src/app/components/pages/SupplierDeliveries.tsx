@@ -92,6 +92,26 @@ export function SupplierDeliveries() {
       console.log("=== CHARGEMENT LIVRAISONS DJANGO ===");
 
       const response = await apiRequest("/v1/deliveries/");
+      
+      console.log(
+  "=== DÉTAILS BDC-2026-0015 ===",
+  (response.results ?? [])
+    .filter(
+      (delivery: any) =>
+        delivery.purchase_order_reference === "BDC-2026-0015"
+    )
+    .map((delivery: any) => ({
+      id: delivery.id,
+      reference: delivery.reference,
+      status: delivery.status,
+      items: (delivery.items ?? []).map((item: any) => ({
+        id: item.id,
+        product: item.product,
+        quantity_ordered: item.quantity_ordered,
+        quantity_received: item.quantity_received,
+      })),
+    }))
+);
 
       console.log(
         "=== RÉPONSE LIVRAISONS DJANGO COMPLÈTE ===",
@@ -753,6 +773,16 @@ const handleUpdate = async (
   try {
     console.log("=== MODIFICATION LIVRAISON DJANGO ===");
     console.log("ID :", deliveryId);
+    console.log("=== ID LIVRAISON MODIFIÉE ===", deliveryId);
+
+console.log(
+  "=== ARTICLES AVANT MODIFICATION ===",
+  items.map((item) => ({
+    id: item.id,
+    productId: item.productId,
+    deliveredQty: item.deliveredQty,
+  }))
+);
 
     const payload = {
       delivery_date: deliveryDate,
@@ -770,6 +800,7 @@ const handleUpdate = async (
       "=== PAYLOAD MODIFICATION LIVRAISON ===",
       JSON.stringify(payload, null, 2)
     );
+    
 
     const response = await apiRequest(
       `/v1/deliveries/${deliveryId}/`,
@@ -920,7 +951,7 @@ setBdcUpdateNote(
 setTimeout(() => setBdcUpdateNote(null), 5000);
   } catch (error) {
     console.error(
-      "=== ERREUR MODIFICATION LIVRAISON DJANGO ===",
+      "=== ERREUR MODIFICATION LIVRAISON DJANGO ===", 
       error
     );
 

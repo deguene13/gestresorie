@@ -8,10 +8,10 @@ import {
 
 import { apiRequest } from "../../apiClient";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 
-import { Search, Plus, Eye, Edit, Send, CheckCircle, Clock, XCircle, Trash2, X, FileSpreadsheet, AlertTriangle } from "lucide-react";
+import { Search, Plus, Eye, Edit, Send, CheckCircle, Clock, XCircle, Trash2, X, FileSpreadsheet, AlertTriangle, Loader2, ClipboardCheck } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useAppData } from "../../context/AppDataContext";
@@ -22,6 +22,7 @@ import {
   createProduct,
   type Product
 } from "../../productsApi";
+import { getCustomerQuotes, reviewCustomerQuoteAvailability } from "../../data/quotesData";
 
 
 type ConfirmState = {
@@ -118,6 +119,16 @@ type Article = {
   unitPrice: number;
 };
 
+type QuoteAvailabilityDecision = {
+  available: boolean | null;
+  note: string;
+};
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export function PurchaseOrders() {
 
 // 👇 AJOUTE ICI
@@ -165,6 +176,16 @@ const [totalPages, setTotalPages] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [rejectModal, setRejectModal] = useState<{ id: string; ref: string } | null>(null);
+  const canReviewCustomerQuotes = hasRole(["admin", "gestionnaire_achats"]);
+  const [customerQuotesToReview, setCustomerQuotesToReview] = useState<any[]>([]);
+  const [loadingCustomerQuotes, setLoadingCustomerQuotes] = useState(false);
+  const [customerQuotesError, setCustomerQuotesError] = useState("");
+  const [selectedQuoteForReview, setSelectedQuoteForReview] = useState<any | null>(null);
+  const [quoteAvailabilityDecisions, setQuoteAvailabilityDecisions] =
+    useState<Record<string, QuoteAvailabilityDecision>>({});
+  const [reviewingQuote, setReviewingQuote] = useState(false);
+  const [quoteReviewError, setQuoteReviewError] = useState("");
+  const reviewInProgress = useRef(false);
 
  const [products, setProducts] = useState<Product[]>([]);
 
@@ -258,6 +279,7 @@ supplierDetail: order.supplier_detail,
     
     // Statut
     
+
     status: normalizeStatus(order.status),
    rejectionComment:
   order.last_rejection_comment ??
@@ -390,6 +412,35 @@ useEffect(() => {
   loadProducts();
 }, []);
 
+useEffect(() => {
+  if (!canReviewCustomerQuotes) return;
+
+  let active = true;
+  setLoadingCustomerQuotes(true);
+  setCustomerQuotesError("");
+  getCustomerQuotes()
+    .then((quotes) => {
+      if (active) {
+        setCustomerQuotesToReview(
+          (Array.isArray(quotes) ? quotes : []).filter(
+            (quote: any) => quote.status === "PURCHASING_REVIEW"
+          )
+        );
+      }
+    })
+    .catch((error) => {
+      console.error("Erreur de chargement des devis à vérifier :", error);
+      if (active) setCustomerQuotesError("Impossible de charger les devis à vérifier.");
+    })
+    .finally(() => {
+      if (active) setLoadingCustomerQuotes(false);
+    });
+
+  return () => {
+    active = false;
+  };
+}, [canReviewCustomerQuotes]);
+
 console.log("SUPPLIERS DANS LE FORMULAIRE :", suppliers);
 
   const [articles, setArticles] = useState<Article[]>([
@@ -413,6 +464,82 @@ console.log("SUPPLIERS DANS LE FORMULAIRE :", suppliers);
 
   return matchesSearch && matchesStatus;
 });
+
+  const openQuoteAvailabilityReview = (quote: any) => {
+    setSelectedQuoteForReview(quote);
+    setQuoteReviewError("");
+    const initialDecisions: Record<string, QuoteAvailabilityDecision> = {};
+    (Array.isArray(quote.items) ? quote.items : []).forEach((item: any) => {
+      if (isUuid(item.id)) {
+        initialDecisions[item.id] = { available: null, note: "" };
+      }
+    });
+    setQuoteAvailabilityDecisions(initialDecisions);
+  };
+
+  const reviewedQuoteLines = Array.isArray(selectedQuoteForReview?.items)
+    ? selectedQuoteForReview.items
+    : [];
+  const unreviewedQuoteLines = reviewedQuoteLines.filter((item: any) =>
+    !isUuid(item.id) ||
+    quoteAvailabilityDecisions[item.id]?.available === null ||
+    quoteAvailabilityDecisions[item.id]?.available === undefined
+  );
+  const canSubmitQuoteReview =
+    reviewedQuoteLines.length > 0 &&
+    reviewedQuoteLines.every((item: any) => isUuid(item.id)) &&
+    unreviewedQuoteLines.length === 0 &&
+    !reviewingQuote;
+
+  const handleReviewCustomerQuote = async () => {
+    if (!selectedQuoteForReview || !canSubmitQuoteReview || reviewInProgress.current) return;
+    reviewInProgress.current = true;
+    setReviewingQuote(true);
+    setQuoteReviewError("");
+
+    const items = reviewedQuoteLines.flatMap((item: any) => {
+      const decision = isUuid(item.id) ? quoteAvailabilityDecisions[item.id] : undefined;
+      if (!decision || typeof decision.available !== "boolean") return [];
+      return [{
+        id: item.id,
+        available: decision.available,
+        note: decision.note,
+      }];
+    });
+
+    try {
+      await reviewCustomerQuoteAvailability(selectedQuoteForReview.id, items);
+      setCustomerQuotesToReview((previous) =>
+        previous.filter((quote) => quote.id !== selectedQuoteForReview.id)
+      );
+      setSelectedQuoteForReview(null);
+      setQuoteAvailabilityDecisions({});
+      addNotification({
+        type: "success",
+        title: "Revue enregistrée",
+        message: "Les disponibilités ont été enregistrées et le devis a été transmis au client.",
+        module: "devis",
+        documentRef: selectedQuoteForReview.reference,
+      });
+
+      try {
+        const refreshedQuotes = await getCustomerQuotes();
+        setCustomerQuotesToReview(
+          (Array.isArray(refreshedQuotes) ? refreshedQuotes : []).filter(
+            (quote: any) => quote.status === "PURCHASING_REVIEW"
+          )
+        );
+      } catch (refreshError) {
+        console.error("Revue enregistrée, mais la liste des devis n'a pas pu être actualisée :", refreshError);
+      }
+    } catch (error) {
+      console.error("Erreur d'enregistrement de la revue de disponibilité :", error);
+      setQuoteReviewError("La revue n'a pas pu être enregistrée. Vos décisions sont conservées, vous pouvez réessayer.");
+    } finally {
+      reviewInProgress.current = false;
+      setReviewingQuote(false);
+    }
+  };
 
   const calculateSubtotal = () => {
     return articles.reduce((sum, article) => sum + (article.quantity * article.unitPrice), 0);
@@ -1031,6 +1158,84 @@ const handleReject = (id: string, ref: string) => {
         </div>
       )}
 
+      {canReviewCustomerQuotes && (
+        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg text-gray-900">Devis clients à vérifier</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Renseignez la disponibilité de chaque article avant la transmission au client.
+              </p>
+            </div>
+            <span className="rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm">
+              {customerQuotesToReview.length}
+            </span>
+          </div>
+          {loadingCustomerQuotes ? (
+            <div className="flex items-center gap-2 px-5 py-6 text-sm text-gray-600">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Chargement des devis...
+            </div>
+          ) : customerQuotesError ? (
+            <div className="px-5 py-5 text-sm text-red-700">{customerQuotesError}</div>
+          ) : customerQuotesToReview.length === 0 ? (
+            <div className="px-5 py-6 text-sm text-gray-500">Aucun devis en attente de vérification.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px]">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-5 py-3 text-left text-xs text-gray-500 uppercase">Référence</th>
+                    <th className="px-5 py-3 text-left text-xs text-gray-500 uppercase">Client</th>
+                    <th className="px-5 py-3 text-left text-xs text-gray-500 uppercase">Date</th>
+                    <th className="px-5 py-3 text-right text-xs text-gray-500 uppercase">Montant</th>
+                    <th className="px-5 py-3 text-left text-xs text-gray-500 uppercase">Statut</th>
+                    <th className="px-5 py-3 text-right text-xs text-gray-500 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {customerQuotesToReview.map((quote: any) => (
+                    <tr key={quote.id}>
+                      <td className="px-5 py-3 text-sm text-gray-900">{quote.reference || quote.number || quote.id}</td>
+                      <td className="px-5 py-3 text-sm text-gray-700">
+                        {quote.customer_detail?.raison_sociale ||
+                          quote.customer_detail?.name ||
+                          quote.customer_name ||
+                          quote.customer ||
+                          "—"}
+                      </td>
+                      <td className="px-5 py-3 text-sm text-gray-700">
+                        {quote.quote_date || quote.created_at || quote.date
+                          ? new Date(quote.quote_date || quote.created_at || quote.date).toLocaleDateString("fr-FR")
+                          : "—"}
+                      </td>
+                      <td className="px-5 py-3 text-sm text-gray-900 text-right">
+                        {Number(quote.total_amount_ttc ?? quote.total_amount ?? quote.total ?? 0).toLocaleString("fr-FR")} FCFA
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">
+                          En vérification par les achats
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openQuoteAvailabilityReview(quote)}
+                          className="inline-flex items-center gap-2 px-3 py-2 text-sm text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50"
+                        >
+                          <ClipboardCheck className="w-4 h-4" />
+                          Vérifier
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 space-y-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -1430,6 +1635,150 @@ const handleReject = (id: string, ref: string) => {
         </div>
       )}
 
+      {selectedQuoteForReview && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h2 className="text-xl text-gray-900">
+                  Vérifier le devis {selectedQuoteForReview.reference || selectedQuoteForReview.number || ""}
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedQuoteForReview.customer_detail?.raison_sociale ||
+                    selectedQuoteForReview.customer_detail?.name ||
+                    selectedQuoteForReview.customer_name ||
+                    selectedQuoteForReview.customer ||
+                    "Client"}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={reviewingQuote}
+                onClick={() => {
+                  setSelectedQuoteForReview(null);
+                  setQuoteAvailabilityDecisions({});
+                  setQuoteReviewError("");
+                }}
+                className="text-gray-400 hover:text-gray-700 disabled:opacity-50"
+                aria-label="Fermer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {reviewedQuoteLines.length === 0 ? (
+              <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                Ce devis ne contient aucune ligne. La validation est impossible.
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+                  {unreviewedQuoteLines.length === 0
+                    ? "Toutes les lignes ont reçu une décision."
+                    : `${unreviewedQuoteLines.length} ligne(s) restante(s) à traiter.`}
+                </div>
+                <div className="space-y-4">
+                  {reviewedQuoteLines.map((item: any, index: number) => {
+                    const hasValidId = isUuid(item.id);
+                    const decision = hasValidId
+                      ? quoteAvailabilityDecisions[item.id] || { available: null, note: "" }
+                      : { available: null, note: "" };
+                    return (
+                      <div key={hasValidId ? item.id : `quote-item-${index}`} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                          <div>
+                            <p className="text-sm text-gray-900">
+                              {item.product_detail?.name || item.product_name || item.product || "Article"}
+                            </p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Quantité : {item.quantity ?? "—"}
+                              {item.unit ? ` ${item.unit}` : ""}
+                            </p>
+                            {!hasValidId && (
+                              <p className="text-xs text-red-700 mt-2">
+                                Identifiant de ligne manquant ou invalide : cette ligne ne peut pas être validée.
+                              </p>
+                            )}
+                          </div>
+                          <div className="w-full md:w-56">
+                            <label className="block text-xs text-gray-600 mb-1">Disponibilité *</label>
+                            <select
+                              value={decision.available === null ? "" : decision.available ? "true" : "false"}
+                              disabled={!hasValidId || reviewingQuote}
+                              onChange={(event) =>
+                                setQuoteAvailabilityDecisions((previous) => ({
+                                  ...previous,
+                                  [item.id]: {
+                                    ...previous[item.id],
+                                    available: event.target.value === "" ? null : event.target.value === "true",
+                                  },
+                                }))
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
+                            >
+                              <option value="">Choisir une décision</option>
+                              <option value="true">Disponible</option>
+                              <option value="false">Indisponible</option>
+                            </select>
+                          </div>
+                        </div>
+                        <label className="block text-xs text-gray-600 mt-3 mb-1">Note (facultatif)</label>
+                        <textarea
+                          value={decision.note}
+                          disabled={!hasValidId || reviewingQuote}
+                          onChange={(event) =>
+                            setQuoteAvailabilityDecisions((previous) => ({
+                              ...previous,
+                              [item.id]: {
+                                ...previous[item.id],
+                                note: event.target.value,
+                              },
+                            }))
+                          }
+                          rows={2}
+                          placeholder="Ex. Rupture de stock"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {quoteReviewError && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {quoteReviewError}
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6">
+              <button
+                type="button"
+                disabled={reviewingQuote}
+                onClick={() => {
+                  setSelectedQuoteForReview(null);
+                  setQuoteAvailabilityDecisions({});
+                  setQuoteReviewError("");
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={!canSubmitQuoteReview}
+                onClick={handleReviewCustomerQuote}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {reviewingQuote && <Loader2 className="w-4 h-4 animate-spin" />}
+                {reviewingQuote ? "Enregistrement..." : "Valider la disponibilité"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <RejectModal
         isOpen={!!rejectModal}
         onClose={() => setRejectModal(null)}
@@ -1559,4 +1908,3 @@ const handleReject = (id: string, ref: string) => {
     </div>
   );
 }
-

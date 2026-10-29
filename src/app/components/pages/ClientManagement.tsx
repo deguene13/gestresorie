@@ -37,6 +37,14 @@ type FormState = {
   payment_terms: number;
 };
 
+type CustomerDocuments = {
+  orders: Record<string, any>[];
+  deliveries: Record<string, any>[];
+  invoices: Record<string, any>[];
+};
+
+type CustomerDocumentSection = keyof CustomerDocuments;
+
 const emptyForm: FormState = {
   raison_sociale: "",
   ninea: "",
@@ -57,6 +65,143 @@ function resolveLogoUrl(logo: string) {
   }
 }
 
+async function getAllDocumentResults(endpoint: string): Promise<Record<string, any>[]> {
+  let response = await apiRequest(endpoint);
+  const results: Record<string, any>[] = [];
+  let pages = 0;
+
+  while (response) {
+    if (Array.isArray(response)) {
+      results.push(...response);
+      return results;
+    }
+
+    if (Array.isArray(response.results)) results.push(...response.results);
+    if (!response.next || typeof response.next !== "string") return results;
+    if (pages >= 99) throw new Error(`Pagination limit reached for ${endpoint}`);
+
+    const nextUrl = new URL(response.next, window.location.origin);
+    response = await apiRequest(`${nextUrl.pathname}${nextUrl.search}`);
+    pages += 1;
+  }
+
+  return results;
+}
+
+function getCustomerId(value: any): string {
+  if (value && typeof value === "object") return String(value.id ?? "");
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function belongsToCustomer(document: Record<string, any>, customerId: string): boolean {
+  const relation = document.customer ?? document.customer_id ?? document.customer_detail;
+  return getCustomerId(relation) === customerId;
+}
+
+function getCustomerDocumentReference(document: Record<string, any>): string {
+  return String(document.reference ?? document.invoice_number ?? document.id ?? "—");
+}
+
+function getCustomerDocumentDate(document: Record<string, any>, section: CustomerDocumentSection): unknown {
+  if (section === "orders") return document.order_date ?? document.created_at;
+  if (section === "deliveries") return document.delivery_date;
+  return document.invoice_date;
+}
+
+function getCustomerDocumentAmount(document: Record<string, any>): number {
+  return Number(document.total_amount_ttc ?? document.total_amount ?? document.total_price ?? 0);
+}
+
+function formatCustomerDocumentDate(value: unknown): string {
+  if (typeof value !== "string" || !value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("fr-FR");
+}
+
+function getRelatedDocumentLabel(
+  document: Record<string, any>,
+  idKeys: string[],
+  referenceKeys: string[],
+  candidates: Record<string, any>[]
+): string {
+  for (const key of idKeys) {
+    const relation = document[key];
+    if (!relation) continue;
+    const relationId = getCustomerId(relation);
+    const match = candidates.find((candidate) => getCustomerId(candidate.id) === relationId);
+    if (match) return getCustomerDocumentReference(match);
+    if (typeof relation === "object" && relation.reference) return String(relation.reference);
+  }
+
+  for (const key of referenceKeys) {
+    const reference = document[key];
+    if (!reference) continue;
+    if (typeof reference === "object" && reference.reference) return String(reference.reference);
+    const referenceId = getCustomerId(reference);
+    const match = candidates.find((candidate) => getCustomerId(candidate.id) === referenceId);
+    return match ? getCustomerDocumentReference(match) : String(reference);
+  }
+
+  return "—";
+}
+
+function getCustomerDocumentStatus(document: Record<string, any>, section: CustomerDocumentSection): string {
+  const rawStatus = String(
+    section === "invoices"
+      ? document.payment_status ?? document.status ?? ""
+      : document.status ?? ""
+  );
+  const labels: Record<string, string> = {
+    DRAFT: "Brouillon",
+    PENDING: "En attente",
+    SENT: "Envoyé",
+    VALIDATED: "Validé",
+    CONFIRMED: "Confirmé",
+    IN_DELIVERY: "En livraison",
+    DELIVERED: "Livré",
+    PARTIAL: "Partielle",
+    REJECTED: "Rejeté",
+    CANCELLED: "Annulé",
+    PAID: "Payée",
+    UNPAID: "Impayée",
+  };
+  return labels[rawStatus] ?? (rawStatus || "—");
+}
+
+function getCustomerDocumentAssociation(
+  document: Record<string, any>,
+  section: CustomerDocumentSection,
+  orders: Record<string, any>[],
+  deliveries: Record<string, any>[]
+): string {
+  if (section === "deliveries") {
+    return getRelatedDocumentLabel(
+      document,
+      ["order", "customer_order"],
+      ["order_reference", "customer_order_reference"],
+      orders
+    );
+  }
+  if (section === "invoices") {
+    const delivery = getRelatedDocumentLabel(
+      document,
+      ["delivery", "customer_delivery"],
+      ["delivery_reference"],
+      deliveries
+    );
+    const order = getRelatedDocumentLabel(
+      document,
+      ["order", "customer_order"],
+      ["order_reference", "customer_order_reference"],
+      orders
+    );
+    return [delivery !== "—" ? `BL ${delivery}` : "", order !== "—" ? `BDC ${order}` : ""]
+      .filter(Boolean)
+      .join(" · ") || "—";
+  }
+  return "—";
+}
+
 export function ClientManagement() {
   const { hasRole } = useAuth();
   const { addNotification } = useAppData();
@@ -75,6 +220,19 @@ export function ClientManagement() {
 
 const [showCustomerDetail, setShowCustomerDetail] =
   useState(false);
+const [customerDocuments, setCustomerDocuments] = useState<CustomerDocuments>({
+  orders: [],
+  deliveries: [],
+  invoices: [],
+});
+const [customerDocumentsLoading, setCustomerDocumentsLoading] = useState(false);
+const [customerDocumentsError, setCustomerDocumentsError] = useState("");
+const [activeCustomerDocumentSection, setActiveCustomerDocumentSection] =
+  useState<CustomerDocumentSection>("orders");
+const [selectedCustomerDocument, setSelectedCustomerDocument] = useState<{
+  section: CustomerDocumentSection;
+  record: Record<string, any>;
+} | null>(null);
 
   const [form, setForm] =
     useState<FormState>(emptyForm);
@@ -114,6 +272,45 @@ const fmt = (value: string | number) =>
     loadCustomers();
   }, []);
 
+  useEffect(() => {
+    if (!showCustomerDetail || !selectedCustomer) return;
+
+    let active = true;
+    setCustomerDocumentsLoading(true);
+    setCustomerDocumentsError("");
+    setCustomerDocuments({ orders: [], deliveries: [], invoices: [] });
+    setSelectedCustomerDocument(null);
+
+    const loadDocuments = async () => {
+      try {
+        const [orders, deliveries, invoices] = await Promise.all([
+          getAllDocumentResults("/v1/customer-orders/"),
+          getAllDocumentResults("/v1/customer-deliveries/"),
+          getAllDocumentResults("/v1/customer-invoices/"),
+        ]);
+
+        if (!active) return;
+        setCustomerDocuments({
+          orders: orders.filter((document) => belongsToCustomer(document, String(selectedCustomer.id))),
+          deliveries: deliveries.filter((document) => belongsToCustomer(document, String(selectedCustomer.id))),
+          invoices: invoices.filter((document) => belongsToCustomer(document, String(selectedCustomer.id))),
+        });
+      } catch (error) {
+        console.error("Erreur de chargement des documents du client :", error);
+        if (active) {
+          setCustomerDocumentsError("Impossible de charger les documents de ce client.");
+        }
+      } finally {
+        if (active) setCustomerDocumentsLoading(false);
+      }
+    };
+
+    void loadDocuments();
+    return () => {
+      active = false;
+    };
+  }, [showCustomerDetail, selectedCustomer?.id]);
+
   const filteredClients = useMemo(() => {
     const q = search.toLowerCase().trim();
 
@@ -132,6 +329,12 @@ const fmt = (value: string | number) =>
     actifs: clients.filter((c) => c.is_active).length,
     inactifs: clients.filter((c) => !c.is_active).length,
   };
+  const visibleCustomerDocuments = customerDocuments[activeCustomerDocumentSection];
+  const customerDocumentTabs: { id: CustomerDocumentSection; label: string }[] = [
+    { id: "orders", label: "Bons de commande" },
+    { id: "deliveries", label: "Bons de livraison" },
+    { id: "invoices", label: "Factures" },
+  ];
 
   const openCreate = () => {
     setEditingClient(null);
@@ -617,7 +820,7 @@ const handleViewCustomer = async (customer: Customer) => {
         <td className="p-3">
           {canManage && (
             <RowActionMenu>
-              <RowActionItem icon={<Eye />} onSelect={() => handleViewCustomer(client)}>Voir</RowActionItem>
+              <RowActionItem icon={<Eye />} onSelect={() => handleViewCustomer(client)}> Consulter document client</RowActionItem>
               <RowActionItem icon={<Edit2 />} onSelect={() => openEdit(client)}>Modifier</RowActionItem>
               <RowActionItem
                 icon={client.is_active ? <ToggleRight /> : <ToggleLeft />}
@@ -856,7 +1059,7 @@ const handleViewCustomer = async (customer: Customer) => {
 
       {showCustomerDetail && selectedCustomer && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
 
             <div className="flex items-center justify-between p-5 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -868,6 +1071,7 @@ const handleViewCustomer = async (customer: Customer) => {
                 onClick={() => {
                   setShowCustomerDetail(false);
                   setSelectedCustomer(null);
+                  setSelectedCustomerDocument(null);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -900,6 +1104,210 @@ const handleViewCustomer = async (customer: Customer) => {
                   </p>
                 </div>
               </div>
+
+              <section className="mt-8 border-t border-gray-200 pt-6">
+                  <h3 className="text-base font-semibold text-gray-900 mb-4">
+                     Liste des documents du client
+                  </h3>
+                  <div className="flex gap-2 overflow-x-auto border-b border-gray-200">
+                    {customerDocumentTabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveCustomerDocumentSection(tab.id);
+                          setSelectedCustomerDocument(null);
+                        }}
+                        className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium ${
+                          activeCustomerDocumentSection === tab.id
+                            ? "border-blue-600 text-blue-700"
+                            : "border-transparent text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        {tab.label}
+                        <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                          {customerDocuments[tab.id].length}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-4">
+                    {customerDocumentsLoading ? (
+                      <p className="py-8 text-center text-sm text-gray-500">
+                        Chargement des documents du client…
+                      </p>
+                    ) : customerDocumentsError ? (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {customerDocumentsError}
+                      </div>
+                    ) : visibleCustomerDocuments.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-gray-500">
+                        Aucun document disponible pour ce client dans cette section.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="w-full min-w-[780px] text-sm">
+                          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                            <tr>
+                              <th className="px-4 py-3">Référence</th>
+                              <th className="px-4 py-3">Document associé</th>
+                              <th className="px-4 py-3">Date</th>
+                              {activeCustomerDocumentSection === "invoices" && (
+                                <th className="px-4 py-3">Échéance</th>
+                              )}
+                              <th className="px-4 py-3 text-right">Montant total</th>
+                              <th className="px-4 py-3">Statut</th>
+                              <th className="px-4 py-3">Détail</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {visibleCustomerDocuments.map((document) => (
+                              <tr key={String(document.id)} className="hover:bg-blue-50/50">
+                                <td className="px-4 py-3 font-medium text-gray-900">
+                                  {getCustomerDocumentReference(document)}
+                                </td>
+                                <td className="px-4 py-3 text-gray-600">
+                                  {getCustomerDocumentAssociation(
+                                    document,
+                                    activeCustomerDocumentSection,
+                                    customerDocuments.orders,
+                                    customerDocuments.deliveries
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-gray-600">
+                                  {formatCustomerDocumentDate(
+                                    getCustomerDocumentDate(document, activeCustomerDocumentSection)
+                                  )}
+                                </td>
+                                {activeCustomerDocumentSection === "invoices" && (
+                                  <td className="px-4 py-3 text-gray-600">
+                                    {formatCustomerDocumentDate(document.due_date)}
+                                  </td>
+                                )}
+                                <td className="px-4 py-3 text-right text-gray-900">
+                                  {fmt(getCustomerDocumentAmount(document))}
+                                </td>
+                                <td className="px-4 py-3 text-gray-600">
+                                  {getCustomerDocumentStatus(document, activeCustomerDocumentSection)}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedCustomerDocument({
+                                      section: activeCustomerDocumentSection,
+                                      record: document,
+                                    })}
+                                    className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    Voir
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedCustomerDocument && (
+                    <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <h4 className="font-semibold text-gray-900">
+                          Détail — {getCustomerDocumentReference(selectedCustomerDocument.record)}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCustomerDocument(null)}
+                          className="text-gray-500 hover:text-gray-700"
+                          aria-label="Fermer le détail du document"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                        <p>
+                          <span className="text-gray-500">Date :</span>{" "}
+                          {formatCustomerDocumentDate(
+                            getCustomerDocumentDate(
+                              selectedCustomerDocument.record,
+                              selectedCustomerDocument.section
+                            )
+                          )}
+                        </p>
+                        {selectedCustomerDocument.section === "invoices" && (
+                          <p>
+                            <span className="text-gray-500">Échéance :</span>{" "}
+                            {formatCustomerDocumentDate(selectedCustomerDocument.record.due_date)}
+                          </p>
+                        )}
+                        <p>
+                          <span className="text-gray-500">Statut :</span>{" "}
+                          {getCustomerDocumentStatus(
+                            selectedCustomerDocument.record,
+                            selectedCustomerDocument.section
+                          )}
+                        </p>
+                        <p>
+                          <span className="text-gray-500">Montant total :</span>{" "}
+                          {fmt(getCustomerDocumentAmount(selectedCustomerDocument.record))}
+                        </p>
+                        {selectedCustomerDocument.section === "deliveries" &&
+                          selectedCustomerDocument.record.notes && (
+                            <p className="sm:col-span-2 lg:col-span-3">
+                              <span className="text-gray-500">Notes / conformité :</span>{" "}
+                              {selectedCustomerDocument.record.notes}
+                            </p>
+                          )}
+                      </div>
+
+                      {(() => {
+                        const lines = Array.isArray(selectedCustomerDocument.record.items)
+                          ? selectedCustomerDocument.record.items
+                          : Array.isArray(selectedCustomerDocument.record.lines)
+                            ? selectedCustomerDocument.record.lines
+                            : [];
+                        if (lines.length === 0) return null;
+                        return (
+                          <div className="mt-4 overflow-x-auto rounded-md border border-gray-200 bg-white">
+                            <table className="w-full min-w-[560px] text-sm">
+                              <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                                <tr>
+                                  <th className="px-3 py-2">Article</th>
+                                  <th className="px-3 py-2 text-right">Quantité</th>
+                                  <th className="px-3 py-2 text-right">Prix unitaire</th>
+                                  <th className="px-3 py-2 text-right">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {lines.map((line: Record<string, any>, index: number) => (
+                                  <tr key={String(line.id ?? index)}>
+                                    <td className="px-3 py-2">
+                                      {line.product_detail?.name ?? line.product_name ?? line.designation ?? "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">{line.quantity ?? line.quantity_delivered ?? "—"}</td>
+                                    <td className="px-3 py-2 text-right">
+                                      {line.unit_price !== undefined ? fmt(line.unit_price) : "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                      {line.total_incl_tax !== undefined
+                                        ? fmt(line.total_incl_tax)
+                                        : line.total_price !== undefined
+                                          ? fmt(line.total_price)
+                                          : "—"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+              </section>
 
               <div className="space-y-3 text-sm">
 

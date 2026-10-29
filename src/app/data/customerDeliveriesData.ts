@@ -34,3 +34,24 @@ export async function validateCustomerDelivery(
     }),
   });
 }
+
+
+export async function updateCustomerDelivery(
+  id: string,
+  data: any
+) {
+  return await apiRequest(`/v1/customer-deliveries/${id}/`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function patchCustomerDelivery(
+  id: string,
+  data: any
+) {
+  return await apiRequest(`/v1/customer-deliveries/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
