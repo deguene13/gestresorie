@@ -9,6 +9,7 @@ export interface Customer {
   phone: string;
   address: string;
   credit_limit: string;
+  available_credit: string;
   payment_terms: number;
   is_active: boolean;
   created_at: string;

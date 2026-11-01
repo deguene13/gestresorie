@@ -34,6 +34,7 @@ import {
   ClipboardList,
   Globe2,
   Users2,
+  ClipboardCheck,
 } from "lucide-react";
 import { DiperfloLogo } from "../shared/DiperfloLogo";
 import { apiRequest } from "../../apiClient";
@@ -60,6 +61,7 @@ function resolveCompanyLogoUrl(logo: string) {
 
 const achatChildren: NavChild[] = [
   { icon: ShoppingCart, label: "Bons de commande", path: "/app/purchase-orders" },
+  { icon: ClipboardCheck, label: "Devis clients à vérifier", path: "/app/customer-quote-reviews" },
   { icon: Truck, label: "Livraison fournisseur", path: "/app/supplier-deliveries" },
   { icon: FileText, label: "Factures fournisseurs", path: "/app/supplier-invoices" },
   { icon: ArrowDownCircle, label: "Paiement fournisseur", path: "/app/payments" },
@@ -314,6 +316,9 @@ export function MainLayout() {
 
   const achatChildrenI18n = [
     { icon: ShoppingCart,    label: t.nav.purchaseOrders[lang],    path: "/app/purchase-orders",      perm: "purchase_orders:view" },
+    ...(auth.hasRole(["admin", "gestionnaire_achats"])
+      ? [{ icon: ClipboardCheck, label: "Devis clients à vérifier", path: "/app/customer-quote-reviews", perm: "purchase_orders:view" }]
+      : []),
     { icon: Truck,           label: t.nav.supplierDeliveries[lang], path: "/app/supplier-deliveries", perm: "supplier_deliveries:view" },
     { icon: FileText,        label: t.nav.supplierInvoices[lang],   path: "/app/supplier-invoices",   perm: "supplier_invoices:view" },
     { icon: ArrowDownCircle, label: t.nav.supplierPayments[lang],   path: "/app/payments",            perm: "payments:view" },

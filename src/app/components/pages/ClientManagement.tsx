@@ -1334,6 +1334,11 @@ const handleViewCustomer = async (customer: Customer) => {
                 </p>
 
                 <p>
+                  <span className="text-gray-400">Avoir disponible :</span>{" "}
+                  {fmt(selectedCustomer.available_credit ?? 0)}
+                </p>
+
+                <p>
                   <span className="text-gray-400">
                     Conditions de paiement :
                   </span>{" "}

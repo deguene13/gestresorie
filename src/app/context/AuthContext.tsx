@@ -47,6 +47,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "purchase_orders:create",
     "purchase_orders:edit",
     "purchase_orders:send",
+    "customer_quotes:verify", // Devis clients à vérifier
     "supplier_deliveries:view",
     "supplier_deliveries:create",
     "supplier_deliveries:edit",

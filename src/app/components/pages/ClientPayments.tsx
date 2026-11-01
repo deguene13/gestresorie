@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Search,
   Plus,
@@ -26,6 +26,8 @@ import {
   completeCustomerPayment,
 } from "../../data/customerPaymentsApi";
 import { getCustomerInvoices } from "../../data/customerInvoicesApi";
+import { getCustomers, type Customer } from "../../data/customersData";
+import { apiRequest } from "../../apiClient";
 import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 
 type MoyenPaiement =
@@ -50,9 +52,12 @@ type ClientPayment = {
   invoiceRef: string;
   invoiceId: string;
   client: string;
+  customerId: string;
   invoiceAmount: number;
   paidAmount: number;
   remainingAmount: number;
+  creditCreated: number;
+  allocations: { invoiceReference: string; amount: number }[];
   moyenPaiement: MoyenPaiement;
   referenceNumber: string;
   status: PaymentStatus;
@@ -148,6 +153,28 @@ const STEPS = [
   "Terminée",
 ];
 
+async function getAllCustomerInvoiceResults(params: Record<string, string | number | boolean>) {
+  let response: any = await getCustomerInvoices(params);
+  const invoices: any[] = [];
+  let pages = 0;
+  while (response) {
+    if (Array.isArray(response)) {
+      invoices.push(...response);
+      break;
+    }
+    if (Array.isArray(response.results)) invoices.push(...response.results);
+    if (!response.next || typeof response.next !== "string") break;
+    if (pages++ >= 99) throw new Error("Trop de pages de factures client à charger.");
+    const next = new URL(response.next, window.location.origin);
+    const apiBasePath = new URL(import.meta.env.VITE_API_URL, window.location.origin).pathname.replace(/\/$/, "");
+    const endpointPath = apiBasePath && next.pathname.startsWith(`${apiBasePath}/`)
+      ? next.pathname.slice(apiBasePath.length)
+      : next.pathname;
+    response = await apiRequest(`${endpointPath}${next.search}`);
+  }
+  return invoices;
+}
+
 function PaymentStepper({ status }: { status: PaymentStatus }) {
   const currentStep = statusConfig[status]?.step ?? -1;
   if (currentStep === -1)
@@ -219,6 +246,8 @@ const emptyForm = {
   invoiceRef: "",
   invoiceId: "",
   client: "",
+  customerId: "",
+  creditToApply: "0",
   invoiceAmount: "",
   paidAmount: "",
   moyenPaiement: "" as MoyenPaiement | "",
@@ -231,6 +260,10 @@ export function ClientPayments() {
   const { lang, t } = useLanguage();
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loadingCustomerInvoices, setLoadingCustomerInvoices] = useState(false);
+  const [customerInvoiceError, setCustomerInvoiceError] = useState("");
+  const invoiceRequestId = useRef(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingPayment, setEditingPayment] =
@@ -247,9 +280,9 @@ export function ClientPayments() {
 
      const response = await getCustomerPayments();
 
-const invoicesResponse = await getCustomerInvoices({
-  payable: true,
-});
+const djangoInvoices = await getAllCustomerInvoiceResults({ payable: true });
+const customerList = await getCustomers();
+setCustomers(customerList);
 
 console.log(
   "Paiements clients Django :",
@@ -258,33 +291,39 @@ console.log(
 
 console.log(
   "Factures clients Django :",
-  JSON.stringify(invoicesResponse, null, 2)
+  JSON.stringify(djangoInvoices, null, 2)
 );
 
 const djangoPayments = response?.results ?? [];
-const djangoInvoices = invoicesResponse?.results ?? [];
 setInvoices(djangoInvoices);
 const invoicesById = Object.fromEntries(
   djangoInvoices.map((invoice: any) => [invoice.id, invoice])
 );
 
 const mappedPayments: ClientPayment[] = djangoPayments.map(
-  (payment: any) => ({
+  (payment: any) => {
+    const customerId = payment.customer ?? invoicesById[payment.invoice]?.customer;
+    const customerInvoices = djangoInvoices.filter((invoice: any) => (invoice.customer?.id ?? invoice.customer) === customerId);
+    const outstanding = customerInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.balance_due ?? 0), 0);
+    const invoiced = customerInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.total_amount_ttc ?? 0), 0);
+    return ({
     id: payment.reference ?? payment.id,
     
     
-   invoiceRef: payment.invoice_reference ?? "-",
-   invoiceId: payment.invoice,
+   invoiceRef: (payment.allocations ?? []).map((a: any) => a.invoice_reference).join(", ") || payment.invoice_reference || "—",
+   invoiceId: payment.invoice ?? "",
    paymentId: payment.id,
     
-     client: invoicesById[payment.invoice]?.customer_detail?.raison_sociale ?? "-",
-    invoiceAmount: Number(
+     client: payment.customer_name ?? invoicesById[payment.invoice]?.customer_detail?.raison_sociale ?? "-",
+    customerId: String(payment.customer ?? invoicesById[payment.invoice]?.customer?.id ?? invoicesById[payment.invoice]?.customer ?? ""),
+    invoiceAmount: payment.invoice ? Number(
   invoicesById[payment.invoice]?.total_amount_ttc ?? 0
-),
+    ) : invoiced,
     paidAmount: Number(payment.amount ?? 0),
+    creditCreated: Number(payment.credit_created ?? 0),
+    allocations: (payment.allocations ?? []).map((allocation: any) => ({ invoiceReference: allocation.invoice_reference, amount: Number(allocation.amount ?? 0) })),
    remainingAmount:
-  Number(invoicesById[payment.invoice]?.total_amount_ttc ?? 0) -
-  Number(payment.amount ?? 0),
+  payment.invoice ? Number(invoicesById[payment.invoice]?.balance_due ?? 0) : outstanding,
    moyenPaiement:
   payment.payment_method === "BANK_TRANSFER"
     ? "virement"
@@ -315,7 +354,8 @@ const mappedPayments: ClientPayment[] = djangoPayments.map(
     date: payment.payment_date ?? "",
     dueDate: invoicesById[payment.invoice]?.due_date ?? "",
     notes: payment.notes ?? "",
-  })
+  });
+  }
 );
 
 setPayments(mappedPayments);
@@ -346,6 +386,43 @@ setPayments(mappedPayments);
   const partialCount = payments.filter(
     (p) => p.remainingAmount > 0 && p.paidAmount > 0
   ).length;
+  const selectedCustomerInvoices = invoices.filter(
+    (invoice) => String(invoice.customer?.id ?? invoice.customer) === formData.customerId
+  );
+  const selectedCustomerOutstanding = selectedCustomerInvoices.reduce(
+    (total, invoice) => total + Number(invoice.balance_due ?? 0), 0
+  );
+
+  async function handleCustomerSelection(customerId: string) {
+    const requestId = ++invoiceRequestId.current;
+    const customer = customers.find((item) => item.id === customerId);
+    setFormData((current) => ({
+      ...current,
+      customerId,
+      client: customer?.raison_sociale ?? "",
+      creditToApply: "0",
+    }));
+    setInvoices([]);
+    setCustomerInvoiceError("");
+    if (!customerId) {
+      setLoadingCustomerInvoices(false);
+      return;
+    }
+
+    setLoadingCustomerInvoices(true);
+    try {
+      const customerInvoices = await getAllCustomerInvoiceResults({
+        payable: true,
+        customer: customerId,
+      });
+      if (requestId === invoiceRequestId.current) setInvoices(customerInvoices);
+    } catch (error) {
+      console.error("Erreur chargement des factures impayées du client :", error);
+      if (requestId === invoiceRequestId.current) setCustomerInvoiceError("Impossible de charger les factures impayées de ce client.");
+    } finally {
+      if (requestId === invoiceRequestId.current) setLoadingCustomerInvoices(false);
+    }
+  }
 
   function advanceStatus(id: string, next: PaymentStatus) {
     setPayments((prev) =>
@@ -359,18 +436,11 @@ setPayments(mappedPayments);
 
  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const invoiceId = invoices.find(
-  (invoice) => invoice.reference === formData.invoiceRef
-)?.id;
-if (!invoiceId) {
-  console.error("UUID facture introuvable :", formData.invoiceRef);
-  return;
-}
-
 console.log("Montant saisi :", formData.paidAmount);
 const paymentData = {
-  invoice: invoiceId,
-  amount: formData.paidAmount,
+  customer: formData.customerId,
+  amount: formData.paidAmount || "0",
+  credit_to_apply: formData.creditToApply,
   payment_method:
   formData.moyenPaiement === "virement"
     ? "BANK_TRANSFER"
@@ -385,7 +455,7 @@ const paymentData = {
     : formData.moyenPaiement === "traite"
     ? "TRAIT"
     : "BANK_TRANSFER",
- payment_date: formData.paymentDate,
+ payment_date: formData.paymentDate || new Date().toISOString().slice(0, 10),
   notes: formData.notes,
 };
 
@@ -409,6 +479,7 @@ if (editingPayment) {
     invoiceRef: formData.invoiceRef,
     invoiceId: formData.invoiceId,
     client: formData.client,
+    customerId: formData.customerId,
     invoiceAmount: invoice,
     paidAmount: paid,
     remainingAmount: Math.max(0, invoice - paid),
@@ -435,16 +506,22 @@ if (editingPayment) {
 
 const invoice = parseFloat(formData.invoiceAmount as string) || 0;
 const paid = parseFloat(formData.paidAmount as string) || 0;
+const customerInvoices = invoices.filter((i) => (i.customer?.id ?? i.customer) === formData.customerId);
+const outstanding = customerInvoices.reduce((sum, i) => sum + Number(i.balance_due ?? 0), 0);
+const invoiced = customerInvoices.reduce((sum, i) => sum + Number(i.total_amount_ttc ?? 0), 0);
 
 const newPayment: ClientPayment = {
   id: createdPayment.reference,
   paymentId: createdPayment.id,
-  invoiceRef: formData.invoiceRef,
-  invoiceId: invoiceId,
+  invoiceRef: (createdPayment.allocations ?? []).map((a: any) => a.invoice_reference).join(", ") || "Affectation à la validation",
+  invoiceId: "",
   client: formData.client,
-  invoiceAmount: invoice,
+  customerId: formData.customerId,
+  invoiceAmount: invoiced || invoice,
   paidAmount: Number(createdPayment.amount),
-  remainingAmount: Math.max(0, invoice - paid),
+  creditCreated: Number(createdPayment.credit_created ?? 0),
+  allocations: (createdPayment.allocations ?? []).map((allocation: any) => ({ invoiceReference: allocation.invoice_reference, amount: Number(allocation.amount ?? 0) })),
+  remainingAmount: Math.max(0, outstanding - paid - Number(formData.creditToApply || 0)),
   moyenPaiement: formData.moyenPaiement as MoyenPaiement,
   referenceNumber: formData.referenceNumber,
   status:
@@ -637,8 +714,26 @@ setShowModal(false);
                         <RowActionMenu>
                           {p.status === "created" && <RowActionItem icon={<ArrowRight />} onSelect={() => advanceStatus(p.id, "pending_validation")}>Soumettre</RowActionItem>}
                           {p.status === "created" && <RowActionItem icon={<Trash2 />} onSelect={async () => { try { await deleteCustomerPayment(p.paymentId); setPayments((prev) => prev.filter((payment) => payment.id !== p.id)); } catch (error) { console.error("Erreur suppression paiement client :", error); } }} destructive>Supprimer</RowActionItem>}
-                          {p.status === "pending_validation" && <RowActionItem icon={<Edit2 />} onSelect={() => { setEditingPayment(p); setFormData((f) => ({ ...f, invoiceRef: p.invoiceRef, invoiceId: p.invoiceId, client: p.client, invoiceAmount: String(p.invoiceAmount), paidAmount: String(p.paidAmount), moyenPaiement: p.moyenPaiement, referenceNumber: p.referenceNumber, paymentDate: p.date, notes: p.notes })); setShowModal(true); }}>Modifier</RowActionItem>}
-                          {p.status === "pending_validation" && <RowActionItem icon={<CheckCircle />} onSelect={async () => { try { await validateCustomerPayment(p.paymentId); advanceStatus(p.id, "validated"); } catch (error) { console.error("Erreur validation paiement client :", error); } }}>Valider</RowActionItem>}
+                          {p.status === "pending_validation" && <RowActionItem icon={<Edit2 />} onSelect={() => { setEditingPayment(p); setFormData((f) => ({ ...f, invoiceRef: p.invoiceRef, invoiceId: p.invoiceId, client: p.client, customerId: p.customerId, invoiceAmount: String(p.invoiceAmount), paidAmount: String(p.paidAmount), creditToApply: "0", moyenPaiement: p.moyenPaiement, referenceNumber: p.referenceNumber, paymentDate: p.date, notes: p.notes })); setShowModal(true); void handleCustomerSelection(p.customerId); }}>Modifier</RowActionItem>}
+                          {p.status === "pending_validation" && <RowActionItem icon={<CheckCircle />} onSelect={async () => { try {
+                            const validated: any = await validateCustomerPayment(p.paymentId);
+                            const allocations = validated.allocations ?? [];
+                            const allocatedTotal = allocations.reduce((sum: number, allocation: any) => sum + Number(allocation.amount ?? 0), 0);
+                            setPayments((prev) => prev.map((payment) => payment.id === p.id ? {
+                              ...payment,
+                              status: "validated",
+                              invoiceRef: allocations.map((allocation: any) => allocation.invoice_reference).join(", ") || payment.invoiceRef,
+                              remainingAmount: Math.max(0, payment.remainingAmount - allocatedTotal),
+                              creditCreated: Number(validated.credit_created ?? 0),
+                              allocations: allocations.map((allocation: any) => ({ invoiceReference: allocation.invoice_reference, amount: Number(allocation.amount ?? 0) })),
+                            } : payment));
+                            const [freshCustomers, freshInvoices] = await Promise.all([
+                              getCustomers(),
+                              getAllCustomerInvoiceResults({ payable: true, customer: p.customerId }),
+                            ]);
+                            setCustomers(freshCustomers);
+                            setInvoices(freshInvoices);
+                          } catch (error) { console.error("Erreur validation paiement client :", error); } }}>Valider</RowActionItem>}
                           {p.status === "pending_validation" && <RowActionItem icon={<XCircle />} onSelect={() => advanceStatus(p.id, "rejected")} destructive>Rejeter</RowActionItem>}
                           {p.status === "pending_validation" && <RowActionItem icon={<Trash2 />} onSelect={async () => { try { await deleteCustomerPayment(p.paymentId); setPayments((prev) => prev.filter((payment) => payment.id !== p.id)); } catch (error) { console.error("Erreur suppression paiement client :", error); } }} destructive>Supprimer</RowActionItem>}
                           {p.status === "validated" && <RowActionItem icon={<Zap />} onSelect={async () => { try { await executeCustomerPayment(p.paymentId); advanceStatus(p.id, "executed"); } catch (error) { console.error("Erreur exécution paiement client :", error); } }}>Exécuter</RowActionItem>}
@@ -675,75 +770,30 @@ setShowModal(false);
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  Référence facture *
-                </label>
-               <select
-  value={formData.invoiceRef}
- onChange={(e) => {
-  const selectedInvoice = invoices.find(
-    (invoice) => invoice.reference === e.target.value
-  );
-
-  setFormData((f) => ({
-    ...f,
-    invoiceRef: selectedInvoice?.reference ?? "",
-    invoiceId: selectedInvoice?.id ?? "",
-    client: selectedInvoice?.customer_detail?.raison_sociale ?? "",
-    invoiceAmount: selectedInvoice?.total_amount_ttc ?? "",
-    
-  }));
-}}
-  required
-  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
->
-  <option value="">Sélectionner une facture</option>
-
-  {invoices.map((invoice) => (
-    <option key={invoice.id} value={invoice.reference}>
-      {invoice.reference} — {invoice.customer_detail?.raison_sociale} —{" "}
-      {invoice.balance_due} {invoice.currency}
-    </option>
-  ))}
-</select>
+                <label className="block text-sm text-gray-700 mb-1">Client *</label>
+                <select required value={formData.customerId} onChange={(e) => void handleCustomerSelection(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm">
+                  <option value="">Sélectionner un client</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.raison_sociale}</option>)}
+                </select>
+                {formData.customerId && <section className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 bg-gray-50 px-3 py-2">
+                    <h3 className="text-sm font-medium text-gray-800">Factures impayées</h3>
+                    <span className="text-xs text-gray-600">Total restant : {selectedCustomerOutstanding.toLocaleString("fr-FR")} FCFA</span>
+                  </div>
+                  {loadingCustomerInvoices ? <p className="px-3 py-4 text-sm text-gray-500">Chargement des factures…</p> : customerInvoiceError ? <p role="alert" className="px-3 py-3 text-sm text-red-600">{customerInvoiceError}</p> : selectedCustomerInvoices.length === 0 ? <p className="px-3 py-4 text-sm text-gray-500">Aucune facture impayée pour ce client.</p> : <div className="divide-y divide-gray-100">
+                    {selectedCustomerInvoices.map((invoice) => <div key={invoice.id} className="grid grid-cols-2 gap-x-3 gap-y-1 px-3 py-2 text-xs">
+                      <span className="col-span-2 font-medium text-gray-800">{invoice.reference}</span>
+                      <span className="text-gray-500">Montant facture</span><span className="text-right text-gray-700">{Number(invoice.total_amount_ttc ?? 0).toLocaleString("fr-FR")} FCFA</span>
+                      <span className="text-gray-500">Déjà réglé</span><span className="text-right text-gray-700">{Number(invoice.amount_paid ?? 0).toLocaleString("fr-FR")} FCFA</span>
+                      <span className="font-medium text-gray-700">Reste à payer</span><span className="text-right font-semibold text-blue-700">{Number(invoice.balance_due ?? 0).toLocaleString("fr-FR")} FCFA</span>
+                    </div>)}
+                  </div>}
+                  <div className="border-t border-gray-200 px-3 py-2 text-sm font-medium text-indigo-700">Crédit disponible : {Number(customers.find((c) => c.id === formData.customerId)?.available_credit ?? 0).toLocaleString("fr-FR")} FCFA</div>
+                </section>}
               </div>
               <div>
                 <label className="block text-sm text-gray-700 mb-1">
-                  Client *
-                </label>
-                <input
-                  type="text"
-                  value={formData.client}
-                  onChange={(e) =>
-                    setFormData((f) => ({ ...f, client: e.target.value }))
-                  }
-                  required
-                  placeholder="Nom du client"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  Montant facture (FCFA) *
-                </label>
-                <input
-                  type="number"
-                  value={formData.invoiceAmount}
-                  onChange={(e) =>
-                    setFormData((f) => ({
-                      ...f,
-                      invoiceAmount: e.target.value,
-                    }))
-                  }
-                  required
-                  min={0}
-                  placeholder="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  Montant encaissé (FCFA) *
+                  Montant versé (FCFA)
                 </label>
                 <input
                   type="number"
@@ -751,11 +801,14 @@ setShowModal(false);
                   onChange={(e) =>
                     setFormData((f) => ({ ...f, paidAmount: e.target.value }))
                   }
-                  required
                   min={0}
                   placeholder="0"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
                 />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Crédit client à utiliser (FCFA)</label>
+                <input type="number" min={0} max={customers.find((c) => c.id === formData.customerId)?.available_credit ?? 0} value={formData.creditToApply} onChange={(e) => setFormData((f) => ({ ...f, creditToApply: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm" />
               </div>
               <div>
                 <label className="block text-sm text-gray-700 mb-2">
@@ -845,6 +898,7 @@ setShowModal(false);
                 </button>
                 <button
                   type="submit"
+                  disabled={loadingCustomerInvoices || Boolean(customerInvoiceError)}
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition text-sm font-medium"
                 >
                     Enrégistrer
@@ -909,6 +963,19 @@ setShowModal(false);
                   <p className="text-sm font-bold text-green-700">
                     {selectedPayment.paidAmount.toLocaleString("fr-FR")} FCFA
                   </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Avoir client créé</p>
+                  <p className="text-sm font-bold text-indigo-700">{selectedPayment.creditCreated.toLocaleString("fr-FR")} FCFA</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Répartition par facture</p>
+                  {selectedPayment.allocations.length ? selectedPayment.allocations.map((allocation) => (
+                    <div key={allocation.invoiceReference} className="flex justify-between text-sm text-gray-700">
+                      <span>{allocation.invoiceReference}</span>
+                      <span>{allocation.amount.toLocaleString("fr-FR")} FCFA</span>
+                    </div>
+                  )) : <p className="text-sm text-gray-500">En attente de validation</p>}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">

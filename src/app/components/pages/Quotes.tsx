@@ -59,6 +59,7 @@ type Quote = {
   status: "Brouillon" | "En vérification par les achats" | "En attente de réponse du client" | "En attente" | "Validé" | "Refusé" | string;
   apiStatus: string;
   createdDate: string;
+  validUntil: string;
   validatedDate?: string;
   refusedDate?: string;
   refusedReason?: string;
@@ -148,7 +149,7 @@ function ActionMenu({
     if (!btnRef.current) return;
     const rect = btnRef.current.getBoundingClientRect();
     const MENU_W = 220;
-    const MENU_H = quote.status === "Brouillon" ? 290 : quote.status === "En attente" ? 210 : 110;
+    const MENU_H = quote.apiStatus === "DRAFT" ? 290 : quote.apiStatus === "PENDING_RESPONSE" ? 210 : 110;
     const spaceBelow = window.innerHeight - rect.bottom;
     const top = spaceBelow > MENU_H ? rect.bottom + 4 : rect.top - MENU_H - 4;
     const left = Math.max(8, rect.right - MENU_W);
@@ -214,8 +215,7 @@ function ActionMenu({
         "text-indigo-600 hover:bg-indigo-50"
       )}
 
-      {quote.status !== "En vérification par les achats" &&
-        (quote.status === "Brouillon" || quote.status === "En attente") && canEdit && (
+      {canEdit && (
         <>
           <div className="border-t border-gray-100 my-1" />
           {/* Modifier */}
@@ -241,7 +241,7 @@ function ActionMenu({
           )}
         </>
       )}
-      {quote.status === "En attente" && canValidate && (
+      {quote.apiStatus === "PENDING_RESPONSE" && canValidate && (
         <>
           {!canEdit && <div className="border-t border-gray-100 my-1" />}
           {/* Valider */}
@@ -261,7 +261,7 @@ function ActionMenu({
         </>
       )}
 
-      {canDelete && quote.apiStatus !== "PURCHASING_REVIEW" && (
+      {canDelete && (
         <>
           <div className="border-t border-gray-100 my-1" />
           {/* Supprimer */}
@@ -518,6 +518,7 @@ const tvaRate =
              : "En attente",
     apiStatus: String(data.status ?? ""),
     createdDate: data.quote_date ?? "",
+    validUntil: data.valid_until ?? "",
   };
 }
 
@@ -529,7 +530,11 @@ export function Quotes() {
   const canEdit     = hasPermission("quotes:edit");
   const canValidate = hasPermission("quotes:validate");
   const canSubmitToPurchasing = hasPermission("quotes:send");
-  const canDelete   = hasRole(["admin"]);
+  const isAdmin = hasRole(["admin"]);
+  const canDeleteQuote = (quote: Quote) =>
+    isAdmin ||
+    (hasRole(["service_commercial"]) &&
+      ["DRAFT", "REJECTED"].includes(quote.apiStatus));
   const isViewOnly  = !canCreate && !canEdit && !canValidate;
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -715,7 +720,7 @@ setQuotes(mappedQuotes);
   const openCreate = () => { setFormError(null); setForm(emptyForm); setItems([newItem()]); setSelected(null); setMode("create"); };
 
   const openEdit = (q: Quote) => {
-    if (q.apiStatus === "PURCHASING_REVIEW") return;
+    if (!isAdmin && q.apiStatus !== "DRAFT") return;
     setFormError(null);
     setForm({ clientId: q.clientId, clientName: q.clientName, clientEmail: q.clientEmail, clientPhone: q.clientPhone,
               clientAddress: q.clientAddress, description: q.description, tvaRate: q.tvaRate, quoteDate: q.createdDate,});
@@ -806,21 +811,29 @@ try {
   "=== PAYLOAD CRÉATION DEVIS CLIENT ===",
   JSON.stringify(payload, null, 2)
 );
-  const createdQuote = await createCustomerQuote(payload);
+  await createCustomerQuote(payload);
 
   console.log(
     "=== DEVIS CRÉÉ DANS DJANGO ===",
-    createdQuote
   );
 } catch (error) {
   console.error(
     "=== ERREUR CRÉATION DEVIS DJANGO ===",
     error
   );
+  setFormError("Impossible de créer le devis.");
+  return;
 }
-    
+
     goList();
-    showToast("Devis créé avec succès !");
+    try {
+      const refreshedQuotes = await getCustomerQuotes();
+      setQuotes(refreshedQuotes.map(mapDjangoQuoteToQuote));
+      showToast("Devis créé avec succès !");
+    } catch (refreshError) {
+      console.error("Devis créé, mais actualisation de la liste impossible :", refreshError);
+      showToast("Devis créé, mais la liste n’a pas pu être actualisée.");
+    }
   };
 
  const handleUpdate = async () => {
@@ -833,12 +846,12 @@ try {
 
   setFormError(null);
 
-  if (!selected || selected.apiStatus === "PURCHASING_REVIEW") return;
+  if (!selected || (!isAdmin && selected.apiStatus !== "DRAFT")) return;
 
   const payload = {
   customer: form.clientId,
   quote_date: selected.createdDate,
-  valid_until: selected.createdDate,
+  valid_until: selected.validUntil || selected.createdDate,
   currency: "XOF",
   notes: form.description,
   items: items.map((item) => ({
@@ -881,7 +894,7 @@ try {
 
   const handleDelete = (id: string) => {
   const quote = quotes.find((item) => item.id === id);
-  if (!quote || quote.apiStatus === "PURCHASING_REVIEW") return;
+  if (!quote || !canDeleteQuote(quote)) return;
   ask(
     "Supprimer ce devis définitivement ? Cette action est irréversible.",
     "Supprimer",
@@ -921,7 +934,7 @@ try {
   if (!q) return;
 
   ask(
-    `Valider le devis ${quoteId} ? Un bon de commande sera automatiquement généré dans la liste des BDC.`,
+    `Valider le devis ${q.reference || quoteId} ? Un bon de commande sera automatiquement généré dans la liste des BDC.`,
     "Valider et générer BDC",
     "bg-green-600 hover:bg-green-700",
     async () => {
@@ -1071,7 +1084,7 @@ console.log(
 // ── Document preview ──────────────────────────────────────────────────────
 const getDocData = (q: Quote) => ({
   type: "Devis" as const,
-  number: q.id,
+  number: q.reference || q.id,
   date: q.createdDate,
 
   // Informations de l'entreprise
@@ -1233,7 +1246,7 @@ const getDocData = (q: Quote) => ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: "Total devis",  val: quotes.length,                                          cls: "text-gray-900" },
-          { label: "En attente",   val: quotes.filter((q) => q.status === "En attente").length,  cls: "text-yellow-600" },
+          { label: "En attente",   val: quotes.filter((q) => q.apiStatus === "PENDING_RESPONSE").length,  cls: "text-yellow-600" },
           { label: "Validés",      val: quotes.filter((q) => q.status === "Validé").length,      cls: "text-green-600" },
         ].map(({ label, val, cls }) => (
           <div key={label} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
@@ -1294,9 +1307,9 @@ const getDocData = (q: Quote) => ({
                       onValidate={() => handleValidate(q.id)}
                       onRefuse={() => setRefuseTarget(q.id)}
                       onDelete={() => handleDelete(q.id)}
-                      canEdit={canEdit}
+                      canEdit={canEdit && (isAdmin || q.apiStatus === "DRAFT")}
                       canValidate={canValidate}
-                      canDelete={canDelete}
+                      canDelete={canDeleteQuote(q)}
                       canSubmitPurchasing={canSubmitToPurchasing}
                       onSubmitPurchasing={() => void handleSubmitToPurchasing(q.id)}
                       submitting={submittingQuoteId === q.id}
@@ -1401,7 +1414,9 @@ const getDocData = (q: Quote) => ({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Modifier le Devis {selected.id}</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Modifier le Devis {selected.reference || selected.id}
+              </h2>
               <button onClick={goList}><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
             </div>
             <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
@@ -1630,14 +1645,13 @@ const getDocData = (q: Quote) => ({
 
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 gap-3 flex-wrap">
               <div className="flex gap-2">
-                {selected.apiStatus !== "PURCHASING_REVIEW" &&
-                  (selected.status === "Brouillon" || selected.status === "En attente") && canEdit && (
+                {canEdit && (isAdmin || selected.apiStatus === "DRAFT") && (
                   <button onClick={() => openEdit(selected)}
                     className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 text-gray-700 transition">
                     <Edit2 className="w-4 h-4" /> Modifier
                   </button>
                 )}
-                {canDelete && selected.apiStatus !== "PURCHASING_REVIEW" && (
+                {canDeleteQuote(selected) && (
                   <button onClick={() => handleDelete(selected.id)}
                     className="flex items-center gap-1.5 px-3 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50 transition">
                     <Trash2 className="w-4 h-4" /> Supprimer
@@ -1650,7 +1664,7 @@ const getDocData = (q: Quote) => ({
                   <FileSearch className="w-4 h-4" /> Aperçu PDF
                 </button>
                 <button onClick={goList} className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 text-gray-700 transition">Fermer</button>
-                {selected.status === "En attente" && canValidate && (
+                {selected.apiStatus === "PENDING_RESPONSE" && canValidate && (
                   <>
                     <button onClick={() => { setRefuseTarget(selected.id); setMode("list"); }}
                       className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600 transition">
