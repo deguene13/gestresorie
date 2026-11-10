@@ -431,18 +431,22 @@ export function MainLayout() {
           />
         ))}
 
-        {/* Separator */}
-        <div className="my-2 border-t border-gray-100" />
+               {can("products:view") && (
+          <>
+            {/* Separator */}
+            <div className="my-2 border-t border-gray-100" />
 
-        {/* Catalogue partagé par les services Achat et Commercial */}
-        <NavItemButton
-          icon={productsNavItem.icon}
-          label={productsNavItem.label}
-          path={productsNavItem.path}
-          isActive={location.pathname === productsNavItem.path}
-          isDarkMode={isDarkMode}
-          onClick={() => onNavigate(productsNavItem.path)}
-        />
+            {/* Catalogue partagé par les services Achat et Commercial */}
+            <NavItemButton
+              icon={productsNavItem.icon}
+              label={productsNavItem.label}
+              path={productsNavItem.path}
+              isActive={location.pathname === productsNavItem.path}
+              isDarkMode={isDarkMode}
+              onClick={() => onNavigate(productsNavItem.path)}
+            />
+          </>
+        )}
 
         {/* Achat group — hidden when no permitted children */}
         {achatChildrenI18n.length > 0 && (
@@ -455,7 +459,7 @@ export function MainLayout() {
             onNavigate={onNavigate}
           />
         )}
-
+        
         {/* Vente group — hidden when no permitted children */}
         {venteChildrenI18n.length > 0 && (
           <NavGroupSection
