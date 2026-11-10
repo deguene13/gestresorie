@@ -7,6 +7,7 @@ import { MainLayout } from "./components/layout/MainLayout";
 import { Dashboard } from "./components/pages/Dashboard";
 import { UserManagement } from "./components/pages/UserManagement";
 import { PurchaseOrders } from "./components/pages/PurchaseOrders";
+import { CustomerQuoteReviews } from "./components/pages/CustomerQuoteReviews";
 import { SupplierDeliveries } from "./components/pages/SupplierDeliveries";
 import { SupplierInvoices } from "./components/pages/SupplierInvoices";
 import { Payments } from "./components/pages/Payments";
@@ -51,16 +52,17 @@ export const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       // Achat
       { path: "purchase-orders", element: <PurchaseOrders /> },
+      { path: "customer-quote-reviews", element: <CustomerQuoteReviews /> },
       { path: "supplier-deliveries", element: <SupplierDeliveries /> },
       { path: "supplier-invoices", element: <SupplierInvoices /> },
       { path: "payments", element: <Payments /> },
+      { path: "products", element: <Products /> },
       // Vente
       { path: "quotes", element: <Quotes /> },
       { path: "client-orders", element: <ClientOrders /> },
       { path: "client-deliveries", element: <ClientDeliveries /> },
       { path: "client-invoices", element: <ClientInvoices /> },
       { path: "client-payments", element: <ClientPayments /> },
-      { path: "products", element: <Products /> },
       // Top-level
       { path: "users", element: <UserManagement /> },
       { path: "collections", element: <OtherCollections /> },

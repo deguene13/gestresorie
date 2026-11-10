@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
-  FileText, Check, X, Eye, Plus, ArrowRight,
+  FileText, Check, X, Eye, Plus, ArrowRight, Send, Loader2,
   Edit2, Trash2, CheckCircle, XCircle, FileSearch,
   AlertTriangle, MoreVertical, Pencil,
 } from "lucide-react";
@@ -24,18 +24,22 @@ import {
    validateCustomerQuote,
    validateCustomerQuoteByCustomer,
    sendCustomerQuoteToCustomer,
+   submitCustomerQuoteToPurchasing,
    rejectCustomerQuote,
 } from "../../data/quotesData";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type QuoteItem = {
   id: number;
+  apiId?: string;
   productId: string;
   productName: string;
   quantity: number;
   unitPrice: number;
   taxRate: number;
   total: number;
+  available: boolean | null;
+  availabilityNote: string;
 };
 
 type Quote = {
@@ -52,8 +56,10 @@ type Quote = {
   tvaRate: number;
   tvaAmount: number;
   total: number;
-  status: "En attente" | "Validé" | "Refusé";
+  status: "Brouillon" | "En vérification par le service d'achats" | "En attente de disponibilité des articles" | "En attente de réponse du client" | "En attente" | "Validé" | "Refusé" | string;
+  apiStatus: string;
   createdDate: string;
+  validUntil: string;
   validatedDate?: string;
   refusedDate?: string;
   refusedReason?: string;
@@ -114,6 +120,9 @@ function ActionMenu({
   canEdit,
   canValidate,
   canDelete,
+  canSubmitPurchasing,
+  onSubmitPurchasing,
+  submitting,
 }: {
   quote: Quote;
   onView: () => void;
@@ -125,6 +134,9 @@ function ActionMenu({
   canEdit: boolean;
   canValidate: boolean;
   canDelete: boolean;
+  canSubmitPurchasing: boolean;
+  onSubmitPurchasing: () => void;
+  submitting: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -137,7 +149,7 @@ function ActionMenu({
     if (!btnRef.current) return;
     const rect = btnRef.current.getBoundingClientRect();
     const MENU_W = 220;
-    const MENU_H = quote.status === "En attente" ? 210 : 110;
+    const MENU_H = quote.apiStatus === "DRAFT" ? 290 : quote.apiStatus === "PENDING_RESPONSE" ? 210 : 110;
     const spaceBelow = window.innerHeight - rect.bottom;
     const top = spaceBelow > MENU_H ? rect.bottom + 4 : rect.top - MENU_H - 4;
     const left = Math.max(8, rect.right - MENU_W);
@@ -164,15 +176,19 @@ function ActionMenu({
     icon: React.ReactNode,
     label: string,
     action: () => void,
-    itemCls = ""
+    itemCls = "",
+    disabled = false
   ) => (
     <button
+      type="button"
+      disabled={disabled}
       onMouseDown={(e) => {
         e.preventDefault();
+        if (disabled) return;
         action();
         close();
       }}
-      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${itemCls}`}
+      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors disabled:cursor-wait disabled:opacity-60 ${itemCls}`}
     >
       <span className="flex-shrink-0 w-4 flex items-center justify-center">{icon}</span>
       <span className="leading-none">{label}</span>
@@ -199,7 +215,7 @@ function ActionMenu({
         "text-indigo-600 hover:bg-indigo-50"
       )}
 
-      {quote.status === "En attente" && canEdit && (
+      {canEdit && (
         <>
           <div className="border-t border-gray-100 my-1" />
           {/* Modifier */}
@@ -209,9 +225,23 @@ function ActionMenu({
             onEdit,
             "text-blue-700 hover:bg-blue-50"
           )}
+          {quote.apiStatus === "DRAFT" && canSubmitPurchasing && (
+            <>
+              <div className="border-t border-gray-100 my-1" />
+              {item(
+                submitting
+                  ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                  : <Send className="w-4 h-4 text-indigo-600" />,
+                submitting ? "Transmission au SA en cours…" : "Transmettre au SA",
+                onSubmitPurchasing,
+                "text-indigo-700 hover:bg-indigo-50",
+                submitting
+              )}
+            </>
+          )}
         </>
       )}
-      {quote.status === "En attente" && canValidate && (
+      {quote.apiStatus === "PENDING_RESPONSE" && canValidate && (
         <>
           {!canEdit && <div className="border-t border-gray-100 my-1" />}
           {/* Valider */}
@@ -383,6 +413,10 @@ function ProductComboBox({
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_STYLE: Record<Quote["status"], string> = {
+  "Brouillon": "bg-gray-100 text-gray-700 border border-gray-200",
+  "En vérification par le service d'achats": "bg-indigo-100 text-indigo-800 border border-indigo-200",
+  "En attente de disponibilité des articles": "bg-orange-100 text-orange-800 border border-orange-200",
+  "En attente de réponse du client": "bg-blue-100 text-blue-800 border border-blue-200",
   "En attente": "bg-yellow-100 text-yellow-800 border border-yellow-200",
   "Validé":     "bg-green-100 text-green-800 border border-green-200",
   "Refusé":     "bg-red-100 text-red-800 border border-red-200",
@@ -390,7 +424,7 @@ const STATUS_STYLE: Record<Quote["status"], string> = {
 
 function Badge({ status }: { status: Quote["status"] }) {
   return (
-    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLE[status]}`}>
+    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLE[status] ?? "bg-gray-100 text-gray-700 border border-gray-200"}`}>
       {status}
     </span>
   );
@@ -406,6 +440,8 @@ const newItem = (): QuoteItem => ({
   unitPrice: 0,
   taxRate: 0,
   total: 0,
+  available: null,
+  availabilityNote: "",
 });
 
 const emptyForm = {
@@ -425,12 +461,15 @@ function mapDjangoQuoteToQuote(data: any): Quote {
   const items: QuoteItem[] = (data.items ?? []).map(
     (item: any, index: number) => ({
       id: index + 1,
+      apiId: typeof item.id === "string" ? item.id : undefined,
       productId: item.product ?? "",
       productName: item.product_detail?.name ?? "",
       quantity: Number(item.quantity ?? 0),
       unitPrice: Number(item.unit_price ?? 0),
       taxRate: Number(item.tax_rate ?? 0),
       total: Number(item.total_price ?? 0),
+      available: item.available === true ? true : item.available === false ? false : null,
+      availabilityNote: item.availability_note ?? "",
     })
   );
 
@@ -467,13 +506,22 @@ const tvaRate =
     tvaRate,
     tvaAmount,
     total,
-   status:
-  data.status === "VALIDATED"
-    ? "Validé"
-    : data.status === "REJECTED"
-    ? "Refusé"
-    : "En attente",
+   status: data.status === "DRAFT"
+     ? "Brouillon"
+     : data.status === "PURCHASING_REVIEW"
+       ? "En vérification par le service d'achats"
+       : data.status === "WAITING_AVAILABILITY"
+         ? "En attente de disponibilité des articles"
+       : data.status === "PENDING_RESPONSE"
+         ? "En attente de réponse du client"
+         : data.status === "VALIDATED"
+           ? "Validé"
+           : data.status === "REJECTED"
+             ? "Refusé"
+             : "En attente",
+    apiStatus: String(data.status ?? ""),
     createdDate: data.quote_date ?? "",
+    validUntil: data.valid_until ?? "",
   };
 }
 
@@ -484,7 +532,12 @@ export function Quotes() {
   const canCreate   = hasPermission("quotes:create");
   const canEdit     = hasPermission("quotes:edit");
   const canValidate = hasPermission("quotes:validate");
-  const canDelete   = hasRole(["admin"]);
+  const canSubmitToPurchasing = hasPermission("quotes:send");
+  const isAdmin = hasRole(["admin"]);
+  const canDeleteQuote = (quote: Quote) =>
+    isAdmin ||
+    (hasRole(["service_commercial"]) &&
+      ["DRAFT", "REJECTED"].includes(quote.apiStatus));
   const isViewOnly  = !canCreate && !canEdit && !canValidate;
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -564,65 +617,8 @@ setQuotes(mappedQuotes);
 }, []);
 
   // ── Quotes data ───────────────────────────────────────────────────────────
-  const [quotes, setQuotes] = useState<Quote[]>([
-    {
-      id: "DEV-001",
-      clientId: "",
-      reference: "DEV-001",
-      clientName: "Entreprise ABC",
-      clientEmail: "contact@abc.sn",
-      clientPhone: "+221 77 123 45 67",
-      clientAddress: "Avenue Bourguiba, Dakar",
-      description: "Équipement informatique pour nouveau bureau",
-      items: [
-       {
-  id: 1,
-  productId: "",
-  productName: "Ordinateur portable Dell",
-  quantity: 5,
-  unitPrice: 850000,
-  taxRate: 0,
-  total: 4250000,
-},
-
-{
-  id: 2,
-  productId: "",
-  productName: "Imprimante HP LaserJet",
-  quantity: 2,
-  unitPrice: 320000,
-  taxRate: 0,
-  total: 640000,
-},
-      ],
-      subtotal: 4890000, tvaRate: 18, tvaAmount: 880200, total: 5770200,
-      status: "En attente", createdDate: "2026-05-05",
-    },
-    {
-      id: "DEV-002",
-      clientId: "",
-       reference: "DEV-002",
-      clientName: "Société Sénégalaise BTP",
-      clientEmail: "achat@ssbtp.sn",
-      clientPhone: "+221 33 856 44 20",
-      clientAddress: "Zone Industrielle Mbao, Dakar",
-      description: "Fournitures de bureau premier trimestre",
-      items: [
-       {
-  id: 1,
-  productId: "",
-  productName: "Chaise de bureau ergonomique",
-  quantity: 10,
-  unitPrice: 245000,
-  taxRate: 0,
-  total: 2450000,
-},
-      ],
-      subtotal: 2450000, tvaRate: 18, tvaAmount: 441000, total: 2891000,
-      status: "Validé", createdDate: "2026-04-20", validatedDate: "2026-04-25",
-      linkedPurchaseOrderId: "BDC-001",
-    },
-  ]);
+ const [quotes, setQuotes] = useState<Quote[]>([]);
+    
 
   // ── UI mode ───────────────────────────────────────────────────────────────
   type Mode = "list" | "create" | "edit" | "detail" | "preview";
@@ -638,6 +634,8 @@ setQuotes(mappedQuotes);
   } | null>(null);
 
   const [refuseTarget, setRefuseTarget] = useState<string | null>(null);
+  const [submittingQuoteId, setSubmittingQuoteId] = useState<string | null>(null);
+  const submitInProgress = useRef(false);
 
   // ── Toast ─────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState<string | null>(null);
@@ -725,6 +723,7 @@ setQuotes(mappedQuotes);
   const openCreate = () => { setFormError(null); setForm(emptyForm); setItems([newItem()]); setSelected(null); setMode("create"); };
 
   const openEdit = (q: Quote) => {
+    if (!isAdmin && !["DRAFT", "WAITING_AVAILABILITY"].includes(q.apiStatus)) return;
     setFormError(null);
     setForm({ clientId: q.clientId, clientName: q.clientName, clientEmail: q.clientEmail, clientPhone: q.clientPhone,
               clientAddress: q.clientAddress, description: q.description, tvaRate: q.tvaRate, quoteDate: q.createdDate,});
@@ -736,6 +735,49 @@ setQuotes(mappedQuotes);
   const goList    = () => { setMode("list");   setSelected(null); };
   const goDetail  = (q: Quote) => { setSelected(q); setMode("detail"); };
   const goPreview = (q: Quote) => { setSelected(q); setMode("preview"); };
+
+  const handleSubmitToPurchasing = async (quoteId: string) => {
+    if (submitInProgress.current) return;
+    const quote = quotes.find((item) => item.id === quoteId);
+    if (!quote || quote.apiStatus !== "DRAFT") return;
+
+    submitInProgress.current = true;
+    setSubmittingQuoteId(quoteId);
+    try {
+      const response = await submitCustomerQuoteToPurchasing(quoteId);
+      const responseQuote = response?.quote ?? response;
+      let updatedQuote = responseQuote?.id
+        ? mapDjangoQuoteToQuote(responseQuote)
+        : {
+            ...quote,
+            apiStatus: "PURCHASING_REVIEW",
+            status: "En vérification par le service d'achats",
+          };
+
+      setQuotes((prev) => prev.map((item) => item.id === quoteId ? updatedQuote : item));
+      if (selected?.id === quoteId) setSelected(updatedQuote);
+
+      try {
+        const refreshedQuotes = await getCustomerQuotes();
+        const refreshed = refreshedQuotes.find((item: any) => String(item.id) === quoteId);
+        if (refreshed) {
+          updatedQuote = mapDjangoQuoteToQuote(refreshed);
+          setQuotes((prev) => prev.map((item) => item.id === quoteId ? updatedQuote : item));
+          if (selected?.id === quoteId) setSelected(updatedQuote);
+        }
+      } catch (refreshError) {
+        console.error("Le devis a été transmis au SA, mais la liste n'a pas pu être actualisée :", refreshError);
+      }
+
+      showToast("Devis transmis au service d'achats (SA) pour vérification.");
+    } catch (error) {
+      console.error("Erreur de transmission du devis au SA :", error);
+      showToast("Impossible de transmettre le devis au service d'achats (SA).");
+    } finally {
+      submitInProgress.current = false;
+      setSubmittingQuoteId(null);
+    }
+  };
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
   const validateForm = () => {
@@ -768,21 +810,33 @@ console.log(
   JSON.stringify(payload, null, 2)
 );
 try {
-  const createdQuote = await createCustomerQuote(payload);
+  console.log(
+  "=== PAYLOAD CRÉATION DEVIS CLIENT ===",
+  JSON.stringify(payload, null, 2)
+);
+  await createCustomerQuote(payload);
 
   console.log(
     "=== DEVIS CRÉÉ DANS DJANGO ===",
-    createdQuote
   );
 } catch (error) {
   console.error(
     "=== ERREUR CRÉATION DEVIS DJANGO ===",
     error
   );
+  setFormError("Impossible de créer le devis.");
+  return;
 }
-    
+
     goList();
-    showToast("Devis créé avec succès !");
+    try {
+      const refreshedQuotes = await getCustomerQuotes();
+      setQuotes(refreshedQuotes.map(mapDjangoQuoteToQuote));
+      showToast("Devis créé avec succès !");
+    } catch (refreshError) {
+      console.error("Devis créé, mais actualisation de la liste impossible :", refreshError);
+      showToast("Devis créé, mais la liste n’a pas pu être actualisée.");
+    }
   };
 
  const handleUpdate = async () => {
@@ -795,12 +849,12 @@ try {
 
   setFormError(null);
 
-  if (!selected) return;
+  if (!selected || (!isAdmin && !["DRAFT", "WAITING_AVAILABILITY"].includes(selected.apiStatus))) return;
 
   const payload = {
   customer: form.clientId,
   quote_date: selected.createdDate,
-  valid_until: selected.createdDate,
+  valid_until: selected.validUntil || selected.createdDate,
   currency: "XOF",
   notes: form.description,
   items: items.map((item) => ({
@@ -842,6 +896,8 @@ try {
 };
 
   const handleDelete = (id: string) => {
+  const quote = quotes.find((item) => item.id === id);
+  if (!quote || !canDeleteQuote(quote)) return;
   ask(
     "Supprimer ce devis définitivement ? Cette action est irréversible.",
     "Supprimer",
@@ -890,14 +946,14 @@ try {
         console.log("Quote ID :", quoteId);
 
         // 1. Enregistrer l'accord du client
-       // 1. Envoyer le devis au client
-const sentQuote = await sendCustomerQuoteToCustomer(
-  quoteId,
-  "Veuillez confirmer votre accord sur ce devis."
-);
-
-console.log("=== DEVIS ENVOYÉ AU CLIENT ===");
-console.log(sentQuote);
+       if (q.apiStatus !== "PENDING_RESPONSE") {
+         const sentQuote = await sendCustomerQuoteToCustomer(
+           quoteId,
+           "Veuillez confirmer votre accord sur ce devis."
+         );
+         console.log("=== DEVIS ENVOYÉ AU CLIENT ===");
+         console.log(sentQuote);
+       }
 
 // 2. Enregistrer l'accord du client
 const validatedQuote = await validateCustomerQuoteByCustomer(
@@ -954,19 +1010,21 @@ console.log(customerOrder);
   quoteId: string,
   reason: string
 ) => {
-  try {
+    const quote = quotes.find((item) => item.id === quoteId);
+    if (!quote) return;
+    try {
     console.log("=== REFUS DEVIS DJANGO ===");
     console.log("ID UUID DJANGO :", quoteId);
     console.log("MOTIF :", reason);
 
-    // 1. Mettre le devis en attente de réponse
-    const sentQuote = await sendCustomerQuoteToCustomer(
-      quoteId,
-      "Veuillez confirmer votre accord ou votre refus sur ce devis."
-    );
-
-    console.log("=== DEVIS ENVOYÉ AU CLIENT ===");
-    console.log(sentQuote);
+    if (quote.apiStatus !== "PENDING_RESPONSE") {
+      const sentQuote = await sendCustomerQuoteToCustomer(
+        quoteId,
+        "Veuillez confirmer votre accord ou votre refus sur ce devis."
+      );
+      console.log("=== DEVIS ENVOYÉ AU CLIENT ===");
+      console.log(sentQuote);
+    }
 
     // 2. Enregistrer le refus du client
     const rejectedQuote = await rejectCustomerQuote(
@@ -1191,7 +1249,7 @@ const getDocData = (q: Quote) => ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: "Total devis",  val: quotes.length,                                          cls: "text-gray-900" },
-          { label: "En attente",   val: quotes.filter((q) => q.status === "En attente").length,  cls: "text-yellow-600" },
+          { label: "En attente",   val: quotes.filter((q) => q.apiStatus === "PENDING_RESPONSE").length,  cls: "text-yellow-600" },
           { label: "Validés",      val: quotes.filter((q) => q.status === "Validé").length,      cls: "text-green-600" },
         ].map(({ label, val, cls }) => (
           <div key={label} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
@@ -1252,9 +1310,12 @@ const getDocData = (q: Quote) => ({
                       onValidate={() => handleValidate(q.id)}
                       onRefuse={() => setRefuseTarget(q.id)}
                       onDelete={() => handleDelete(q.id)}
-                      canEdit={canEdit}
+                      canEdit={canEdit && (isAdmin || ["DRAFT", "WAITING_AVAILABILITY"].includes(q.apiStatus))}
                       canValidate={canValidate}
-                      canDelete={canDelete}
+                      canDelete={canDeleteQuote(q)}
+                      canSubmitPurchasing={canSubmitToPurchasing}
+                      onSubmitPurchasing={() => void handleSubmitToPurchasing(q.id)}
+                      submitting={submittingQuoteId === q.id}
                     />
                   </td>
                 </tr>
@@ -1503,6 +1564,21 @@ const getDocData = (q: Quote) => ({
             </div>
 
             <div className="p-6 space-y-5">
+              {selected.apiStatus === "PENDING_RESPONSE" && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                  La revue des achats a été enregistrée et le devis a été transmis au client.
+                </div>
+              )}
+              {selected.apiStatus === "PURCHASING_REVIEW" && (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
+                  Devis en vérification par le service d'achats. Sa modification est bloquée pendant cette étape.
+                </div>
+              )}
+              {selected.apiStatus === "WAITING_AVAILABILITY" && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+                  Un ou plusieurs articles sont indisponibles. Ce document reste un devis et aucun bon de commande ne peut être généré avant confirmation de la disponibilité de tous les articles. Les articles concernés et les commentaires du SA sont indiqués dans le tableau ci-dessous. Vous pouvez modifier le devis pour demander une nouvelle vérification.
+                </div>
+              )}
               <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-y-2 text-sm">
                 <div><span className="text-gray-500">Client : </span>{selected.clientName}</div>
                 <div><span className="text-gray-500">Email : </span>{selected.clientEmail}</div>
@@ -1529,7 +1605,7 @@ const getDocData = (q: Quote) => ({
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      {["Désignation", "Qté", "Prix U.", "Total"].map((h, i) => (
+                      {["Désignation", "Qté", "Prix U.", "Total", "Disponibilité", "Note des achats"].map((h, i) => (
                         <th key={h} className={`px-4 py-2 font-medium text-gray-500 text-xs uppercase tracking-wider ${i > 0 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
@@ -1541,6 +1617,16 @@ const getDocData = (q: Quote) => ({
                         <td className="px-4 py-2 text-right text-gray-600">{item.quantity}</td>
                         <td className="px-4 py-2 text-right text-gray-600">{item.unitPrice.toLocaleString()} FCFA</td>
                         <td className="px-4 py-2 text-right font-medium text-gray-900">{item.total.toLocaleString()} FCFA</td>
+                        <td className="px-4 py-2 text-right">
+                          {item.available === true ? (
+                            <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">Disponible</span>
+                          ) : item.available === false ? (
+                            <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">Indisponible</span>
+                          ) : (
+                            <span className="text-xs text-gray-400">Non évalué</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-left text-gray-600">{item.availabilityNote || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1565,13 +1651,13 @@ const getDocData = (q: Quote) => ({
 
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 gap-3 flex-wrap">
               <div className="flex gap-2">
-                {selected.status === "En attente" && canEdit && (
+                {canEdit && (isAdmin || ["DRAFT", "WAITING_AVAILABILITY"].includes(selected.apiStatus)) && (
                   <button onClick={() => openEdit(selected)}
                     className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 text-gray-700 transition">
                     <Edit2 className="w-4 h-4" /> Modifier
                   </button>
                 )}
-                {canDelete && (
+                {canDeleteQuote(selected) && (
                   <button onClick={() => handleDelete(selected.id)}
                     className="flex items-center gap-1.5 px-3 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50 transition">
                     <Trash2 className="w-4 h-4" /> Supprimer
@@ -1584,7 +1670,7 @@ const getDocData = (q: Quote) => ({
                   <FileSearch className="w-4 h-4" /> Aperçu PDF
                 </button>
                 <button onClick={goList} className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 text-gray-700 transition">Fermer</button>
-                {selected.status === "En attente" && canValidate && (
+                {selected.apiStatus === "PENDING_RESPONSE" && canValidate && (
                   <>
                     <button onClick={() => { setRefuseTarget(selected.id); setMode("list"); }}
                       className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600 transition">

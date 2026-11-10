@@ -1074,11 +1074,14 @@ try {
   setDocumentMessage("");
 
   setFormData((f) => ({
-    ...f,
-    invoiceId: invoice?.id || "",
-    invoiceRef: invoice?.invoice_number || invoice?.reference || "",
-    supplier: invoice?.supplier_detail?.raison_sociale || "",
-  }));
+  ...f,
+  invoiceId: invoice?.id || "",
+  invoiceRef: invoice?.invoice_number || invoice?.reference || "",
+  supplier: invoice?.supplier_detail?.raison_sociale || "",
+  amount: invoice
+    ? String(invoice.balance_due ?? invoice.total_amount ?? invoice.amount ?? "")
+    : "",
+}));
 }}
   required
   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"

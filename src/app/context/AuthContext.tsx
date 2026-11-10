@@ -43,6 +43,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
 
   gestionnaire_achats: [
     "dashboard:view",
+    "products:view",
     "purchase_orders:view",
     "purchase_orders:create",
     "purchase_orders:edit",
@@ -129,6 +130,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
 
   comptable: [
     "dashboard:view",
+    "products:view",
     "supplier_invoices:view",
     "supplier_invoices:manage",
     "supplier_invoices:create",

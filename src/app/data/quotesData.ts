@@ -1,8 +1,22 @@
 import { apiRequest } from "../apiClient";
 
 export const getCustomerQuotes = async () => {
-  const response = await apiRequest("/v1/quotes/customer/");
-  return response.results ?? [];
+  const quotes: any[] = [];
+  let page = 1;
+  let hasNext = true;
+
+  while (hasNext) {
+    const response = await apiRequest(`/v1/quotes/customer/?page=${page}`);
+    const results = Array.isArray(response)
+      ? response
+      : response?.results ?? [];
+
+    quotes.push(...results);
+    hasNext = !Array.isArray(response) && Boolean(response?.next);
+    page += 1;
+  }
+
+  return quotes;
 };
 
 export async function createCustomerQuote(data: {
@@ -31,6 +45,13 @@ export async function updateCustomerQuote(
     valid_until: string;
     currency: string;
     notes: string;
+    items: {
+      id?: string;
+      product: string;
+      quantity: string;
+      unit_price: string;
+      tax_rate: string;
+    }[];
   }
 ) {
   return await apiRequest(`/v1/quotes/customer/${id}/`, {
@@ -90,6 +111,27 @@ export async function sendCustomerQuoteToCustomer(
       body: JSON.stringify({
         message,
       }),
+    }
+  );
+}
+
+export async function submitCustomerQuoteToPurchasing(id: string) {
+  return await apiRequest(
+    `/v1/quotes/customer/${id}/submit-to-purchasing/`,
+    { method: "POST" }
+  );
+}
+
+export async function reviewCustomerQuoteAvailability(
+  id: string,
+  items: { id: string; available: boolean; note: string }[],
+  comment = ""
+) {
+  return await apiRequest(
+    `/v1/quotes/customer/${id}/review-availability/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ items, comment }),
     }
   );
 }

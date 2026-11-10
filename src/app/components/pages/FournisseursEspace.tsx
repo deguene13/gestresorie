@@ -242,7 +242,7 @@ function ConformiteModal({
         </div>
         <div className="p-5 space-y-4">
           <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
-            <span className="font-semibold">BL :</span> {bl.id} · <span className="font-semibold">BDC :</span> {bl.bdcRef}<br />
+           <span className="font-semibold">BL :</span> {bl.reference || bl.id} · <span className="font-semibold">BDC :</span> {bl.bdcRef}<br />
             <span className="text-gray-600 mt-1 block">{bl.items}</span>
           </div>
           <div>
@@ -352,6 +352,10 @@ function SendBDCModal({
 /* ─── BL PDF ─────────────────────────────────────────────────────────  */
 
 function generateBLPdf(bl: BLRow, fournisseur: typeof FOURNISSEURS[0] | undefined) {
+ console.log("ID du BL :", bl.id);
+  console.log("RÉFÉRENCE DU BL :", bl.reference);
+
+  // Le reste du code reste inchangé
   const w = window.open("", "_blank", "width=800,height=640");
   if (!w) return;
   w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>BL ${bl.id}</title>
@@ -376,10 +380,10 @@ function generateBLPdf(bl: BLRow, fournisseur: typeof FOURNISSEURS[0] | undefine
   </head><body>
   <div class="header">
     <div class="company"><h1>TRÉSOR — SÉNÉGAL</h1><p>Gestion de Trésorerie et Comptabilité</p></div>
-    <div class="doc-title"><h2>Bordereau de Livraison</h2><p style="text-align:right;font-size:14px;color:#555">${bl.id}</p></div>
+    <div class="doc-title"><h2>Bordereau de Livraison</h2><p style="text-align:right;font-size:14px;color:#555">${bl.reference || bl.id}</p></div>
   </div>
   <div class="info-grid">
-    <div class="info-box"><h4>Informations BL</h4><p><strong>N° BL :</strong> ${bl.id}</p><p><strong>BDC :</strong> ${bl.bdcRef}</p><p><strong>Date :</strong> ${bl.date}</p><p><strong>Statut :</strong> ${bl.status}</p></div>
+    <div class="info-box"><h4>Informations BL</h4><p><strong>N° BL :</strong> ${bl.reference || bl.id}</p><p><strong>BDC :</strong> ${bl.bdcRef}</p><p><strong>Date :</strong> ${bl.date}</p><p><strong>Statut :</strong> ${bl.status}</p></div>
     <div class="info-box"><h4>Fournisseur</h4><p><strong>${fournisseur?.name ?? ""}</strong></p><p>${fournisseur?.phone ?? ""}</p><p>${fournisseur?.email ?? ""}</p><p>NINEA : ${fournisseur?.ninea ?? ""}</p></div>
   </div>
   <table><thead><tr><th>Désignation</th><th>Statut livraison</th></tr></thead>
@@ -391,6 +395,7 @@ function generateBLPdf(bl: BLRow, fournisseur: typeof FOURNISSEURS[0] | undefine
     <div class="sig"><div class="line"></div><div class="lbl">Visa Gestionnaire</div></div>
   </div>
   </body></html>`);
+  w.document.title = bl.reference || "Bon de livraison";
   w.document.close();
   w.focus();
   setTimeout(() => w.print(), 500);
@@ -526,15 +531,22 @@ setBdcList(normalizedBdc);
 
 useEffect(() => {
   const loadDeliveries = async () => {
+    
     console.log("=== CHARGEMENT LIVRAISONS DJANGO ESPACE FOURNISSEURS ===");
 
     try {
       const response = await apiRequest("/v1/deliveries/");
+      
 
       console.log(
         "=== LIVRAISONS DJANGO ESPACE FOURNISSEURS ===",
         JSON.stringify(response, null, 2)
       );
+      console.log("Diagnostic BL :", response.results.map((delivery: any) => ({
+  id: delivery.id,
+  reference: delivery.reference,
+  keys: Object.keys(delivery),
+})));
 
       const normalizedBl: BLRow[] = response.results.map(
         (delivery: any) => ({
