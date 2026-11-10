@@ -48,6 +48,7 @@ type PaymentStatus =
 
 type ClientPayment = {
   id: string;
+  reference?: string;
   paymentId: string;
   invoiceRef: string;
   invoiceId: string;
@@ -307,7 +308,8 @@ const mappedPayments: ClientPayment[] = djangoPayments.map(
     const outstanding = customerInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.balance_due ?? 0), 0);
     const invoiced = customerInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.total_amount_ttc ?? 0), 0);
     return ({
-    id: payment.reference ?? payment.id,
+    id: payment.id,
+    reference: payment.reference,
     
     
    invoiceRef: (payment.allocations ?? []).map((a: any) => a.invoice_reference).join(", ") || payment.invoice_reference || "—",
@@ -373,7 +375,7 @@ setPayments(mappedPayments);
 
   const filtered = payments.filter(
     (p) =>
-      p.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.reference ?? p.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.invoiceRef.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -669,7 +671,7 @@ setShowModal(false);
                   return (
                     <tr key={p.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {p.id}
+                        {p.reference || "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {p.invoiceRef}
@@ -918,7 +920,7 @@ setShowModal(false);
                 <h2 className="text-lg font-semibold text-gray-900">
                   Détail de l'encaissement
                 </h2>
-                <p className="text-sm text-gray-500">{selectedPayment.id}</p>
+                <p className="text-sm text-gray-500">{selectedPayment.reference || "—"}</p>
               </div>
               <button
                 onClick={() => setShowDetailModal(false)}

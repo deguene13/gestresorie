@@ -301,7 +301,8 @@ function convertDjangoUser(
       : ROLE_PERMISSIONS[role] ?? [];
 
   const name =
-    djangoUser.full_name ||
+    djangoUser.full_name?.trim() ||
+    [djangoUser.first_name, djangoUser.last_name].filter(Boolean).join(" ").trim() ||
     djangoUser.email.split("@")[0];
 
   const avatar = name

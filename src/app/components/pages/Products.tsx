@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, Edit, Trash2, X } from "lucide-react";
+import { Search, Plus, Edit, Trash2, X, Tags } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
-import { apiRequest } from "../../apiClient";
 import { RowActionItem, RowActionMenu } from "../shared/RowActionMenu";
 import {
   type Product,
+  type ProductCategory,
   getProducts,
+  getProductCategories,
   createProduct,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  createProductCategory,
+  updateProductCategory,
+  deleteProductCategory,
 } from "../../data/productsData";
 
 
@@ -22,64 +26,33 @@ export function Products() {
   unit: string;
   defaultPrice: number;
   category: string;
+  categoryId: string;
   isActive: boolean;
   createdDate: string;
 };
 
 const [products, setProducts] = useState<ProductUI[]>([]);
+const [categories, setCategories] = useState<ProductCategory[]>([]);
 
  useEffect(() => {
   const loadProducts = async () => {
     try {
-      console.log("=== CHARGEMENT PRODUITS DJANGO ===");
-
-      const response = await apiRequest("/v1/products/");
-
-      console.log("=== RÉPONSE PRODUITS DJANGO ===", response);
-
-      console.log(
-        "=== PRODUITS DJANGO RESULTS ===",
-        response.results
-      );
-
-      console.log(
-        "=== PREMIER PRODUIT JSON ===",
-        JSON.stringify(response.results?.[0], null, 2)
-      );
-      console.log("PRODUITS DJANGO :", products);
-
-      const formattedProducts = (response.results || []).map(
-        (product: any) => ({
+      const [productList, categoryList] = await Promise.all([getProducts(), getProductCategories()]);
+      const formattedProducts = productList.map((product) => ({
           id: product.id,
           code: product.code,
           name: product.name,
           description: product.description || "",
           unit: product.unit,
-          category: product.category || "",
+          category: product.category_detail?.name || "Sans catégorie",
+          categoryId: product.category,
          defaultPrice: Number(product.unit_price || 0),
           isActive: product.is_active,
           createdDate: product.created_at,
-        })
-      );
-
-      console.log(
-        "=== PRODUITS FORMATÉS POUR REACT ===",
-        formattedProducts
-      );
+        }));
 
       setProducts(formattedProducts);
-      
-      console.log(
-  "=== PRIX DES PRODUITS ===",
-  JSON.stringify(
-    formattedProducts.map((p: any) => ({
-      name: p.name,
-      defaultPrice: p.defaultPrice,
-    })),
-    null,
-    2
-  )
-);
+      setCategories(categoryList);
 
     } catch (error) {
       console.error(
@@ -103,14 +76,61 @@ const [products, setProducts] = useState<ProductUI[]>([]);
   defaultPrice: 0,
   category: "",
 });
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
+  const [categoryError, setCategoryError] = useState("");
+  const [formError, setFormError] = useState("");
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const openNewProduct = () => {
+    setFormError("");
+    setEditingProduct(null);
+    setFormData({ code: "", name: "", description: "", unit: "piece", defaultPrice: 0, category: "" });
+    setShowModal(true);
+  };
+
+  const handleSaveCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = categoryName.trim();
+    if (!name) {
+      setCategoryError("Le nom de la catégorie est obligatoire.");
+      return;
+    }
+    try {
+      if (editingCategory) await updateProductCategory(editingCategory.id, name);
+      else await createProductCategory(name);
+      setCategories(await getProductCategories());
+      setCategoryName("");
+      setEditingCategory(null);
+      setCategoryError("");
+    } catch {
+      setCategoryError("Impossible d'enregistrer cette catégorie. Vérifiez son nom et réessayez.");
+    }
+  };
+
+  const handleDeleteCategory = async (category: ProductCategory) => {
+    if (!confirm(`Supprimer la catégorie « ${category.name} » ?`)) return;
+    try {
+      await deleteProductCategory(category.id);
+      setCategories(await getProductCategories());
+    } catch {
+      setCategoryError("Cette catégorie est utilisée par un produit et ne peut pas être supprimée.");
+    }
+  };
+
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
+
+  if (!formData.category) {
+    setFormError("Sélectionnez une catégorie pour le produit.");
+    return;
+  }
+  setFormError("");
 
   try {
     if (editingProduct) {
@@ -178,18 +198,21 @@ const [products, setProducts] = useState<ProductUI[]>([]);
         description: product.description || "",
         unit: product.unit,
         defaultPrice: Number(product.unit_price || 0),
-        category: product.category || "",
+        category: product.category_detail?.name || "Sans catégorie",
+        categoryId: product.category,
         isActive: product.is_active,
         createdDate: product.created_at,
       })
     );
 
     setProducts(formattedProducts);
+    setCategories(await getProductCategories());
 
     setShowModal(false);
     resetForm();
 
   } catch (error) {
+    setFormError("Impossible d'enregistrer le produit. Vérifiez les champs et réessayez.");
     console.error(
       "=== ERREUR PRODUIT DJANGO ===",
       error
@@ -219,7 +242,7 @@ const handleEdit = (product: ProductUI) => {
     description: product.description || "",
     unit: product.unit,
     defaultPrice: product.defaultPrice,
-    category: product.category || "",
+    category: product.categoryId,
   });
 
   setShowModal(true);
@@ -244,7 +267,8 @@ const handleEdit = (product: ProductUI) => {
         name: product.name,
         description: product.description || "",
         unit: product.unit,
-        category: product.category || "",
+        category: product.category_detail?.name || "Sans catégorie",
+        categoryId: product.category,
         defaultPrice: Number(product.unit_price || 0),
         isActive: product.is_active,
         createdDate: product.created_at,
@@ -252,6 +276,7 @@ const handleEdit = (product: ProductUI) => {
     );
 
     setProducts(formattedProducts);
+    setCategories(await getProductCategories());
 
   } catch (error) {
     console.error("=== ERREUR SUPPRESSION PRODUIT ===", error);
@@ -266,13 +291,19 @@ const handleEdit = (product: ProductUI) => {
           <h1 className="text-2xl text-gray-900">{t.products.title[lang]}</h1>
           <p className="text-gray-600 mt-1">{t.products.subtitle[lang]}</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          {t.products.newProduct[lang]}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => { setShowCategoryModal(true); setCategoryError(""); }} className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50">
+            <Tags className="mr-2 h-5 w-5" /> Gérer les catégories
+          </button>
+          <button
+            onClick={openNewProduct}
+            disabled={categories.length === 0}
+            className="flex items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-white transition hover:from-blue-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="mr-2 h-5 w-5" />
+            {t.products.newProduct[lang]}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
@@ -296,7 +327,7 @@ const handleEdit = (product: ProductUI) => {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
           <div className="text-sm text-gray-600 mb-1">Catégories</div>
           <div className="text-2xl text-gray-900">
-            {new Set(products.map(p => p.category)).size}
+            {categories.length}
           </div>
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
@@ -374,6 +405,48 @@ const handleEdit = (product: ProductUI) => {
           </table>
         </div>
       </div>
+
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
+          <div className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Gestion des catégories</h2>
+              <button type="button" onClick={() => { setShowCategoryModal(false); setEditingCategory(null); setCategoryName(""); setCategoryError(""); }} aria-label="Fermer">
+                <X className="h-6 w-6 text-gray-400 hover:text-gray-600" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveCategory} className="mb-5 flex gap-2">
+              <input
+                value={categoryName}
+                onChange={(event) => setCategoryName(event.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2"
+                placeholder="Nom de la catégorie"
+                aria-label="Nom de la catégorie"
+                maxLength={100}
+                required
+              />
+              <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+                {editingCategory ? "Enregistrer" : "Ajouter"}
+              </button>
+              {editingCategory && <button type="button" onClick={() => { setEditingCategory(null); setCategoryName(""); }} className="rounded-lg border px-3 py-2">Annuler</button>}
+            </form>
+            {categoryError && <p className="mb-3 text-sm text-red-600">{categoryError}</p>}
+            <div className="max-h-80 divide-y overflow-y-auto rounded-lg border border-gray-200">
+              {categories.length === 0 ? (
+                <p className="p-4 text-sm text-gray-500">Aucune catégorie. Ajoutez-en une pour créer des produits.</p>
+              ) : categories.map((category) => (
+                <div key={category.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <span className="text-sm font-medium text-gray-800">{category.name}</span>
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => { setEditingCategory(category); setCategoryName(category.name); setCategoryError(""); }} className="rounded p-2 text-gray-500 hover:bg-gray-100" aria-label={`Modifier ${category.name}`}><Edit className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => void handleDeleteCategory(category)} className="rounded p-2 text-red-600 hover:bg-red-50" aria-label={`Supprimer ${category.name}`}><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4">
@@ -453,14 +526,17 @@ const handleEdit = (product: ProductUI) => {
 </div>
                 <div>
                   <label className="block text-sm text-gray-700 mb-2">Catégorie *</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="Ex: Informatique"
                     required
-                  />
+                  >
+                    <option value="">Sélectionner une catégorie</option>
+                    {categories.filter((category) => category.is_active).map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-700 mb-2">Prix par défaut (FCFA) *</label>
@@ -491,6 +567,7 @@ const handleEdit = (product: ProductUI) => {
                   {editingProduct ? "Mettre à jour" : "Créer"}
                 </button>
               </div>
+              {formError && <p className="mt-3 text-sm text-red-600">{formError}</p>}
             </form>
           </div>
         </div>

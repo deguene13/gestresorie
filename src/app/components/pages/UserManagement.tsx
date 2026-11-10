@@ -462,6 +462,7 @@ console.log("=== ERREUR COMPLÈTE ===", error);
         body: JSON.stringify(payload),
       }
     );
+    window.dispatchEvent(new Event("audit-log-updated"));
 
     console.log(
       "=== STATUT UTILISATEUR MODIFIÉ DJANGO ===",

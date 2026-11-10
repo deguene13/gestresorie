@@ -1205,7 +1205,7 @@ const handleReject = (id: string, ref: string) => {
                 <tbody className="divide-y divide-gray-100">
                   {customerQuotesToReview.map((quote: any) => (
                     <tr key={quote.id}>
-                      <td className="px-5 py-3 text-sm text-gray-900">{quote.reference || quote.number || quote.id}</td>
+                      <td className="px-5 py-3 text-sm text-gray-900">{quote.reference || quote.number || "Devis sans référence"}</td>
                       <td className="px-5 py-3 text-sm text-gray-700">
                         {quote.customer_detail?.raison_sociale ||
                           quote.customer_detail?.name ||

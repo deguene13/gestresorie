@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAppData } from "../../context/AppDataContext";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "next-themes";
 import {
   LayoutDashboard,
   Users,
@@ -21,6 +22,8 @@ import {
   Trash2,
   CheckCircle,
   Bell,
+  Moon,
+  Sun,
   Settings,
   LogOut,
   ChevronDown,
@@ -36,7 +39,6 @@ import {
   Users2,
   ClipboardCheck,
 } from "lucide-react";
-import { DiperfloLogo } from "../shared/DiperfloLogo";
 import { apiRequest } from "../../apiClient";
 
 type NavChild = { icon: any; label: string; path: string };
@@ -57,6 +59,14 @@ function resolveCompanyLogoUrl(logo: string) {
   } catch {
     return logo;
   }
+}
+
+function getCompanyInitials(name?: string | null) {
+  const words = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "EN";
+  return words.length === 1
+    ? words[0].slice(0, 2).toUpperCase()
+    : `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
 }
 
 const achatChildren: NavChild[] = [
@@ -94,6 +104,7 @@ function NavItemButton({
   label,
   path,
   isActive,
+  isDarkMode,
   onClick,
   indent = false,
 }: {
@@ -101,6 +112,7 @@ function NavItemButton({
   label: string;
   path: string;
   isActive: boolean;
+  isDarkMode: boolean;
   onClick: () => void;
   indent?: boolean;
 }) {
@@ -110,7 +122,9 @@ function NavItemButton({
       className={`w-full flex items-center px-3 py-2.5 mb-1 rounded-lg transition text-sm ${
         indent ? "pl-8" : ""
       } ${isActive ? "" : "text-gray-700 hover:bg-gray-100"}`}
-      style={isActive ? { backgroundColor: "#E6E6FF", color: "#0000FF" } : {}}
+      style={isActive ? (isDarkMode
+        ? { backgroundColor: "#312e81", color: "#e0e7ff" }
+        : { backgroundColor: "#E6E6FF", color: "#0000FF" }) : {}}
     >
       <Icon className="w-4 h-4 mr-3 flex-shrink-0" />
       <span className="truncate">{label}</span>
@@ -121,12 +135,14 @@ function NavItemButton({
 function NavGroupSection({
   group,
   isOpen,
+  isDarkMode,
   toggle,
   location,
   onNavigate,
 }: {
   group: NavGroup;
   isOpen: boolean;
+  isDarkMode: boolean;
   toggle: () => void;
   location: any;
   onNavigate: (path: string) => void;
@@ -141,7 +157,9 @@ function NavGroupSection({
         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition text-sm ${
           isGroupActive ? "" : "text-gray-700 hover:bg-gray-100"
         }`}
-        style={isGroupActive ? { backgroundColor: "#F0F0FF", color: "#0000FF" } : {}}
+        style={isGroupActive ? (isDarkMode
+          ? { backgroundColor: "#1e1b4b", color: "#c7d2fe" }
+          : { backgroundColor: "#F0F0FF", color: "#0000FF" }) : {}}
       >
         <div className="flex items-center">
           <Icon className="w-4 h-4 mr-3 flex-shrink-0" />
@@ -163,6 +181,7 @@ function NavGroupSection({
               label={child.label}
               path={child.path}
               isActive={location.pathname === child.path}
+              isDarkMode={isDarkMode}
               onClick={() => onNavigate(child.path)}
               indent={false}
             />
@@ -188,6 +207,8 @@ export function MainLayout() {
   const [parametresOpen, setParametresOpen] = useState(false);
 
   const { lang, setLang, t } = useLanguage();
+  const { theme, setTheme } = useTheme();
+  const isDarkMode = theme === "dark";
   const {
   notifications,
   unreadCount,
@@ -227,7 +248,12 @@ export function MainLayout() {
 
         if (!linkedCompany?.id) {
           if (active) {
-            setCompanyBranding({ userId, companyId: null, name: linkedCompany?.name ?? "", logo: null });
+            setCompanyBranding({
+              userId,
+              companyId: authenticatedCompany?.id ?? null,
+              name: linkedCompany?.name ?? authenticatedCompany?.name ?? "",
+              logo: linkedCompany?.logo ?? authenticatedCompany?.logo ?? null,
+            });
           }
           return;
         }
@@ -252,9 +278,9 @@ export function MainLayout() {
         if (active) {
           setCompanyBranding({
             userId,
-            companyId: null,
-            name: auth.user?.company?.name ?? "",
-            logo: null,
+            companyId: authenticatedCompany?.id ?? null,
+            name: authenticatedCompany?.name ?? "",
+            logo: authenticatedCompany?.logo ?? null,
           });
         }
       }
@@ -291,8 +317,24 @@ export function MainLayout() {
     ? resolveCompanyLogoUrl(visibleCompanyBranding.logo)
     : null;
   const renderSidebarBranding = (iconSize: number) => {
+    const initials = getCompanyInitials(visibleCompanyBranding?.name);
     if (!companyLogoUrl || failedLogoUrl === companyLogoUrl) {
-      return <DiperfloLogo iconSize={iconSize} onDark={false} />;
+      return (
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            className="flex flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 font-semibold text-white"
+            style={{ width: iconSize, height: iconSize, fontSize: Math.max(12, iconSize * 0.38) }}
+            aria-label={`Initiales de ${visibleCompanyBranding?.name || "l'entreprise"}`}
+          >
+            {initials}
+          </div>
+          {visibleCompanyBranding?.name && (
+            <span className="min-w-0 truncate text-sm font-semibold text-gray-800">
+              {visibleCompanyBranding.name}
+            </span>
+          )}
+        </div>
+      );
     }
 
     return (
@@ -384,6 +426,7 @@ export function MainLayout() {
             label={item.label}
             path={item.path}
             isActive={location.pathname === item.path}
+            isDarkMode={isDarkMode}
             onClick={() => onNavigate(item.path)}
           />
         ))}
@@ -397,6 +440,7 @@ export function MainLayout() {
           label={productsNavItem.label}
           path={productsNavItem.path}
           isActive={location.pathname === productsNavItem.path}
+          isDarkMode={isDarkMode}
           onClick={() => onNavigate(productsNavItem.path)}
         />
 
@@ -405,6 +449,7 @@ export function MainLayout() {
           <NavGroupSection
             group={{ icon: ShoppingCart, label: t.nav.achat[lang], key: "achat", children: achatChildrenI18n }}
             isOpen={achatOpen}
+            isDarkMode={isDarkMode}
             toggle={() => setAchatOpen(!achatOpen)}
             location={location}
             onNavigate={onNavigate}
@@ -416,6 +461,7 @@ export function MainLayout() {
           <NavGroupSection
             group={{ icon: Receipt, label: t.nav.vente[lang], key: "vente", children: venteChildrenI18n }}
             isOpen={venteOpen}
+            isDarkMode={isDarkMode}
             toggle={() => setVenteOpen(!venteOpen)}
             location={location}
             onNavigate={onNavigate}
@@ -433,6 +479,7 @@ export function MainLayout() {
     label={item.label}
     path={item.path}
     isActive={location.pathname === item.path}
+    isDarkMode={isDarkMode}
     onClick={() => onNavigate(item.path)}
   />
 ))}
@@ -447,6 +494,7 @@ export function MainLayout() {
       children: parametresChildrenI18n,
     }}
     isOpen={parametresOpen}
+    isDarkMode={isDarkMode}
     toggle={() => setParametresOpen(!parametresOpen)}
     location={location}
     onNavigate={onNavigate}
@@ -469,9 +517,9 @@ export function MainLayout() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50">
+      <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-slate-950">
       {/* Sidebar - Desktop */}
-      <div className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r lg:border-gray-200 lg:bg-white">
+      <div className={`hidden lg:flex lg:flex-col lg:w-64 lg:border-r ${isDarkMode ? "border-slate-700 bg-slate-900" : "border-gray-200 bg-white"}`}>
         <div className="flex items-center h-16 px-4 border-b border-gray-200 flex-shrink-0">
           {renderSidebarBranding(36)}
         </div>
@@ -485,7 +533,7 @@ export function MainLayout() {
           onClick={() => setSidebarOpen(false)}
         >
           <div
-            className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl flex flex-col"
+            className={`fixed inset-y-0 left-0 w-64 shadow-xl flex flex-col ${isDarkMode ? "bg-slate-900" : "bg-white"}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 flex-shrink-0">
@@ -502,7 +550,7 @@ export function MainLayout() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
+        <header className={`h-16 border-b flex items-center justify-between px-4 lg:px-6 flex-shrink-0 ${isDarkMode ? "bg-slate-900 border-slate-700" : "bg-white border-gray-200"}`}>
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
@@ -513,14 +561,15 @@ export function MainLayout() {
           <div className="flex-1 lg:flex-none" />
 
           <div className="flex items-center gap-3">
-            <div
-              className="flex min-w-0 items-center"
-              title={visibleCompanyBranding?.name || "Entreprise"}
+            <button
+              type="button"
+              onClick={() => setTheme(isDarkMode ? "light" : "dark")}
+              className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition"
+              aria-label={isDarkMode ? "Activer le mode clair" : "Activer le mode nuit"}
+              title={isDarkMode ? "Mode clair" : "Mode nuit"}
             >
-              <span className="hidden max-w-32 truncate text-sm font-medium text-gray-700 md:block">
-                {visibleCompanyBranding?.name || "Entreprise"}
-              </span>
-            </div>
+              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
 
             {/* Language toggle */}
             <button
@@ -631,7 +680,8 @@ export function MainLayout() {
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100"
+                className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800"
+                aria-label="Ouvrir le menu utilisateur"
               >
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
                   {auth.user?.avatar ?? "??"}
@@ -640,10 +690,11 @@ export function MainLayout() {
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 dark:border-slate-700 dark:bg-slate-900">
                   {auth.user && (
                     <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-semibold text-gray-900">{auth.user.name}</p>
+                      <p className="break-words text-sm font-semibold text-gray-900">{auth.user.name}</p>
+                      <p className="mt-0.5 break-all text-xs text-gray-500">{auth.user.email}</p>
                       <p className="text-xs text-gray-500 capitalize">{
                         auth.user.role === "daf" ? "DAF" :
                         auth.user.role === "gestionnaire_achats" ? "Gest. Achats" :
@@ -654,14 +705,14 @@ export function MainLayout() {
                   )}
                   <button
                     onClick={() => { navigate("/app/settings"); setUserMenuOpen(false); }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center dark:hover:bg-slate-800"
                   >
                     <Settings className="w-4 h-4 mr-3" />
                     {t.nav.settings[lang]}
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 flex items-center dark:hover:bg-slate-800"
                   >
                     <LogOut className="w-4 h-4 mr-3" />
                     {t.nav.logout[lang]}

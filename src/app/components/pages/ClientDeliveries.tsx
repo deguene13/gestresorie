@@ -518,7 +518,7 @@ const handleEditDelivery = (delivery: any) => {
     delivery: ClientDelivery
   ) => {
     alert(
-      `Bon de livraison ${delivery.id} généré avec succès. Ouverture du document...`
+      `Bon de livraison ${delivery.reference || ""} généré avec succès. Ouverture du document...`
     );
   };
 

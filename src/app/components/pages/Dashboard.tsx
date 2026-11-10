@@ -297,9 +297,8 @@ const recentTransactionsData = [...transactions]
   )
   .slice(0, 5)
   .map((transaction: any) => ({
-    id:
-  transaction.reference ||
-  (transaction.source === "MANUAL" ? "MAN-" + transaction.id.slice(0, 8) : transaction.id),
+    id: transaction.id,
+    reference: transaction.reference || (transaction.source === "MANUAL" ? "MAN-" + transaction.id.slice(0, 8) : "—"),
     type:
       transaction.transaction_type === "CREDIT"
         ? "Encaissement"
@@ -445,7 +444,7 @@ console.log(
         ["Type", "Référence", "Fournisseur", "Montant", "Statut", "Date"],
         ...recentTransactions.map(t => [
           t.type,
-          t.id,
+          t.reference,
           t.supplier,
           t.amount.toString(),
           statusConfig[t.status as keyof typeof statusConfig].label,
@@ -462,7 +461,7 @@ console.log(
     } else if (format === "excel") {
       const excelData = `Type,Référence,Fournisseur,Montant,Statut,Date\n` +
         recentTransactions.map(t =>
-          `${t.type},${t.id},${t.supplier},${t.amount},${statusConfig[t.status as keyof typeof statusConfig].label},${new Date(t.date).toLocaleDateString("fr-FR")}`
+          `${t.type},${t.reference},${t.supplier},${t.amount},${statusConfig[t.status as keyof typeof statusConfig].label},${new Date(t.date).toLocaleDateString("fr-FR")}`
         ).join("\n");
       const blob = new Blob(["\uFEFF" + excelData], { type: "application/vnd.ms-excel;charset=utf-8;" });
       const link = document.createElement("a");
@@ -483,7 +482,7 @@ Paiements à venir: 328 000 FCFA
 TRANSACTIONS RÉCENTES
 ================================================
 ${recentTransactions.map(t =>
-  `${t.id} | ${t.type} | ${t.supplier} | ${t.amount.toLocaleString()} FCFA | ${statusConfig[t.status as keyof typeof statusConfig].label} | ${new Date(t.date).toLocaleDateString("fr-FR")}`
+  `${t.reference} | ${t.type} | ${t.supplier} | ${t.amount.toLocaleString()} FCFA | ${statusConfig[t.status as keyof typeof statusConfig].label} | ${new Date(t.date).toLocaleDateString("fr-FR")}`
 ).join("\n")}
       `.trim();
 
@@ -703,7 +702,7 @@ ${recentTransactions.map(t =>
               {recentTransactions.map((transaction) => (
                 <tr key={transaction.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {transaction.id}
+                    {transaction.reference}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {transaction.type}

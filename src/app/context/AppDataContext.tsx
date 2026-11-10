@@ -477,8 +477,10 @@ allAudit = [
     userId: audit.user_detail?.id || "",
     userName: audit.user_full_name || audit.user_detail?.full_name || "",
     userRole: audit.user_role || audit.user_detail?.role || "",
-    action: audit.action || "",
-    module: audit.model_name || "",
+    action: audit.model_name === "User" && audit.action === "STATUS_CHANGE"
+      ? (audit.changes?.to === "Actif" ? "Réactivation du compte" : "Désactivation du compte")
+      : audit.action || "",
+    module: audit.model_name === "User" ? "Utilisateur" : audit.model_name || "",
     documentRef: audit.object_repr || "",
     oldStatus: audit.changes?.from || undefined,
     newStatus: audit.changes?.to || undefined,
@@ -497,6 +499,8 @@ allAudit = [
 
 loadNotifications();
 loadAuditLog();
+window.addEventListener("audit-log-updated", loadAuditLog);
+return () => window.removeEventListener("audit-log-updated", loadAuditLog);
 }, [isInitialized, user]);
 
 useEffect(() => {

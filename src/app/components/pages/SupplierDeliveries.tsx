@@ -541,7 +541,7 @@ console.log(
           total: i.deliveredQty * i.unitPrice,
         })),
       });
-      setBdcUpdateNote(`Facture générée automatiquement pour ${formData.supplier} — BL ${newDelivery.id}`);
+      setBdcUpdateNote(`Facture générée automatiquement pour ${formData.supplier} — BL ${newDelivery.reference || "créé"}`);
     } else if (status === "complete") {
       setBdcUpdateNote(`Le statut du BDC ${formData.bdcRef} a été mis à jour automatiquement.`);
     }

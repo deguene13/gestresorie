@@ -1064,7 +1064,7 @@ setInvoices(refreshedInvoices);
     if (!printContent) return;
     const printWindow = window.open("", "", "width=800,height=600");
     if (!printWindow) return;
-    printWindow.document.write(`<html><head><title>Facture Fournisseur - ${selectedInvoice?.id}</title><style>body{margin:0;padding:0;font-family:Arial,sans-serif;}@media print{@page{size:A4;margin:0;}}</style></head><body>${printContent.innerHTML}</body></html>`);
+    printWindow.document.write(`<html><head><title>Facture Fournisseur - ${selectedInvoice?.invoice_number || selectedInvoice?.reference || ""}</title><style>body{margin:0;padding:0;font-family:Arial,sans-serif;}@media print{@page{size:A4;margin:0;}}</style></head><body>${printContent.innerHTML}</body></html>`);
     printWindow.document.close();
     await Promise.all(
       Array.from(printWindow.document.images, (image) =>
@@ -1898,7 +1898,7 @@ const handleApproveDaf = async (invoiceId: string) => {
           <div className="bg-white rounded-xl max-w-2xl w-full p-6 my-8">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h2 className="text-xl text-gray-900">{selectedInvoice.id}</h2>
+    <h2 className="text-xl text-gray-900">{selectedInvoice.invoice_number || selectedInvoice.reference || "Facture fournisseur"}</h2>
                 
               </div>
               <button onClick={() => setShowDetailModal(false)}>

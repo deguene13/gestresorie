@@ -676,7 +676,7 @@ const handlePay = async (disbursementId: string) => {
                  className="hover:bg-gray-50"
                  >
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {disbursement.reference || disbursement.id}
+                    {disbursement.reference || "—"}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {disbursement.reason}

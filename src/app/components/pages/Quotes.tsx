@@ -1087,7 +1087,7 @@ console.log(
 // ── Document preview ──────────────────────────────────────────────────────
 const getDocData = (q: Quote) => ({
   type: "Devis" as const,
-  number: q.id,
+  number: q.reference || "—",
   date: q.createdDate,
 
   // Informations de l'entreprise
@@ -1120,7 +1120,7 @@ const getDocData = (q: Quote) => ({
     if (!el) return;
     const win = window.open("", "", "width=900,height=700");
     if (!win) return;
-    win.document.write(`<html><head><title>Devis ${selected?.id}</title><style>body{margin:0;font-family:Arial,sans-serif}@media print{@page{size:A4;margin:0}}</style></head><body>${el.innerHTML}</body></html>`);
+  win.document.write(`<html><head><title>Devis ${selected?.reference || ""}</title><style>body{margin:0;font-family:Arial,sans-serif}@media print{@page{size:A4;margin:0}}</style></head><body>${el.innerHTML}</body></html>`);
     win.document.close();
     setTimeout(() => { win.print(); win.close(); }, 300);
   };
@@ -1417,7 +1417,7 @@ const getDocData = (q: Quote) => ({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Modifier le Devis {selected.id}</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Modifier le devis {selected.reference}</h2>
               <button onClick={goList}><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
             </div>
             <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">

@@ -300,13 +300,9 @@ function toDocData(
 
   switch (category) {
    case "devis":
-    console.log("=== DEVIS SELECTIONNE ===", {
-  id: item.id,
-  reference: item.reference,
-});
   return {
     type: "Devis",
-    number: item.reference || item.id,
+    number: item.reference || item.quote_number || "—",
 
     date: item.quote_date
       ? new Date(item.quote_date).toLocaleDateString("fr-FR")
@@ -348,7 +344,7 @@ companyLogo: company?.logo || null,
   const orderCustomer = getCustomerForDocument(item, customers);
   return {
     type: "Bon de commande",
-    number: item.reference || item.id,
+    number: item.reference || item.order_number || "—",
 
     date: item.order_date
       ? new Date(item.order_date).toLocaleDateString("fr-FR")
@@ -392,7 +388,7 @@ companyLogo: company?.logo || null,
   return {
     type: "Bon de commande",
 
-    number: item.reference || item.id,
+    number: item.reference || item.order_number || "—",
 
     date: item.order_date
       ? new Date(item.order_date).toLocaleDateString("fr-FR")
@@ -463,7 +459,7 @@ companyLogo: company?.logo || null,
   return {
     type: "Facture",
 
-    number: item.reference || item.id,
+    number: item.reference || item.invoice_number || "—",
 
     date: item.invoice_date
       ? new Date(item.invoice_date).toLocaleDateString("fr-FR")
@@ -601,7 +597,7 @@ companyEmail:
   return {
     type: "Bordereau de livraison",
 
-    number: item.reference || item.id,
+    number: item.reference || "—",
 
     date: item.delivery_date
       ? new Date(item.delivery_date).toLocaleDateString("fr-FR")
@@ -692,7 +688,7 @@ total: (item.items || []).reduce((sum: number, i: any) => {
   return {
     type: "Bordereau de livraison",
 
-    number: item.reference || item.id,
+    number: item.reference || "—",
 
     date: item.delivery_date
       ? new Date(item.delivery_date).toLocaleDateString("fr-FR")

@@ -180,6 +180,28 @@
   }
 }
 
+/* Neutral utility colors used throughout the application pages. */
+.dark body { color-scheme: dark; }
+.dark .bg-white { background-color: #111827; }
+.dark .bg-gray-50 { background-color: #0f172a; }
+.dark .bg-gray-100 { background-color: #1f2937; }
+.dark .bg-gray-200 { background-color: #374151; }
+.dark .bg-gray-300 { background-color: #4b5563; }
+.dark .text-gray-900, .dark .text-gray-800 { color: #f9fafb; }
+.dark .text-gray-700 { color: #e5e7eb; }
+.dark .text-gray-600 { color: #d1d5db; }
+.dark .text-gray-500, .dark .text-gray-400 { color: #9ca3af; }
+.dark .border-gray-50,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-gray-400 { border-color: #374151; }
+.dark .hover\:bg-gray-50:hover { background-color: #1f2937; }
+.dark .hover\:bg-gray-100:hover { background-color: #374151; }
+.dark input,
+.dark textarea,
+.dark select { color-scheme: dark; }
+
 /* Print styles for documents */
 @media print {
   @page {

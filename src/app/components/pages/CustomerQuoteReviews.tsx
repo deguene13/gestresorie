@@ -214,7 +214,7 @@ export function CustomerQuoteReviews() {
                   const date = quote.quote_date || quote.created_at;
                   return (
                     <tr key={quote.id}>
-                      <td className="px-5 py-4 text-sm font-medium text-gray-900">{quote.reference || quote.id}</td>
+                      <td className="px-5 py-4 text-sm font-medium text-gray-900">{quote.reference || "Devis sans référence"}</td>
                       <td className="px-5 py-4 text-sm text-gray-700">{getCustomerName(quote)}</td>
                       <td className="px-5 py-4 text-sm text-gray-600">
                         {date ? new Date(date).toLocaleDateString("fr-FR") : "—"}
@@ -256,7 +256,7 @@ export function CustomerQuoteReviews() {
             <header className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 id="quote-review-title" className="text-xl font-semibold text-gray-900">
-                  Vérifier le devis {selectedQuote.reference || selectedQuote.id}
+                  Vérifier le devis {selectedQuote.reference || "sans référence"}
                 </h2>
                 <p className="mt-1 text-sm text-gray-600">Client : {getCustomerName(selectedQuote)}</p>
               </div>

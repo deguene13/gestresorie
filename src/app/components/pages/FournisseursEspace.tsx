@@ -242,7 +242,7 @@ function ConformiteModal({
         </div>
         <div className="p-5 space-y-4">
           <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
-           <span className="font-semibold">BL :</span> {bl.reference || bl.id} · <span className="font-semibold">BDC :</span> {bl.bdcRef}<br />
+           <span className="font-semibold">BL :</span> {bl.reference || "—"} · <span className="font-semibold">BDC :</span> {bl.bdcRef}<br />
             <span className="text-gray-600 mt-1 block">{bl.items}</span>
           </div>
           <div>
@@ -320,7 +320,7 @@ function SendBDCModal({
         </div>
         <div className="p-5 space-y-3">
           <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-3 text-sm">
-            <p className="font-semibold text-blue-900">{bdc.id}</p>
+            <p className="font-semibold text-blue-900">{bdc.reference || "Bon de commande"}</p>
             <p className="text-blue-700 text-xs mt-0.5">{bdc.items}</p>
             <p className="text-blue-600 text-xs mt-1">Montant : <strong>{fmt(bdc.amount)}</strong></p>
           </div>
@@ -352,13 +352,10 @@ function SendBDCModal({
 /* ─── BL PDF ─────────────────────────────────────────────────────────  */
 
 function generateBLPdf(bl: BLRow, fournisseur: typeof FOURNISSEURS[0] | undefined) {
- console.log("ID du BL :", bl.id);
-  console.log("RÉFÉRENCE DU BL :", bl.reference);
-
   // Le reste du code reste inchangé
   const w = window.open("", "_blank", "width=800,height=640");
   if (!w) return;
-  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>BL ${bl.id}</title>
+  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>BL ${bl.reference || ""}</title>
   <style>
     body{font-family:Arial,sans-serif;margin:0;padding:40px;color:#1a1a1a}
     .header{display:flex;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:20px;margin-bottom:30px}
@@ -380,10 +377,10 @@ function generateBLPdf(bl: BLRow, fournisseur: typeof FOURNISSEURS[0] | undefine
   </head><body>
   <div class="header">
     <div class="company"><h1>TRÉSOR — SÉNÉGAL</h1><p>Gestion de Trésorerie et Comptabilité</p></div>
-    <div class="doc-title"><h2>Bordereau de Livraison</h2><p style="text-align:right;font-size:14px;color:#555">${bl.reference || bl.id}</p></div>
+    <div class="doc-title"><h2>Bordereau de Livraison</h2><p style="text-align:right;font-size:14px;color:#555">${bl.reference || "—"}</p></div>
   </div>
   <div class="info-grid">
-    <div class="info-box"><h4>Informations BL</h4><p><strong>N° BL :</strong> ${bl.reference || bl.id}</p><p><strong>BDC :</strong> ${bl.bdcRef}</p><p><strong>Date :</strong> ${bl.date}</p><p><strong>Statut :</strong> ${bl.status}</p></div>
+    <div class="info-box"><h4>Informations BL</h4><p><strong>N° BL :</strong> ${bl.reference || "—"}</p><p><strong>BDC :</strong> ${bl.bdcRef}</p><p><strong>Date :</strong> ${bl.date}</p><p><strong>Statut :</strong> ${bl.status}</p></div>
     <div class="info-box"><h4>Fournisseur</h4><p><strong>${fournisseur?.name ?? ""}</strong></p><p>${fournisseur?.phone ?? ""}</p><p>${fournisseur?.email ?? ""}</p><p>NINEA : ${fournisseur?.ninea ?? ""}</p></div>
   </div>
   <table><thead><tr><th>Désignation</th><th>Statut livraison</th></tr></thead>
@@ -1030,11 +1027,11 @@ const handleDeleteSupplier = async (supplier: SupplierUI) => {
     addNotification({
       type: status === "Conforme" ? "success" : "warning",
       title: status === "Conforme" ? "BL conforme vérifié" : "Litige signalé sur BL",
-      message: `${conformiteTarget.id} — ${selectedF.name} : ${note}`,
+      message: `${conformiteTarget.reference || "Bon de livraison"} — ${selectedF.name} : ${note}`,
       module: "fournisseurs_espace",
-      documentRef: conformiteTarget.id,
+      documentRef: conformiteTarget.reference || "Bon de livraison",
     });
-    logAudit(`Vérification conformité BL : ${status}`, conformiteTarget.id, selectedF.name);
+    logAudit(`Vérification conformité BL : ${status}`, conformiteTarget.reference || "Bon de livraison", selectedF.name);
     setConformiteTarget(null);
   };
 

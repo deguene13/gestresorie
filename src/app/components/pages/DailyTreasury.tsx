@@ -1131,7 +1131,7 @@ const engagements: Engagement[] = useMemo(() => {
     )
     .map((o: any) => ({
       id: o.id,
-      reference: o.reference || o.order_number || o.id,
+      reference: o.reference || o.order_number || "—",
       fournisseur:
         o.supplier_detail?.raison_sociale ||
         o.supplier_name ||
